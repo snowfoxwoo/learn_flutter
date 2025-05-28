@@ -6,12 +6,9 @@ plugins {
 }
 
 android {
-    ndkVersion = "27.0.12077973"
     namespace = "com.example.flouriscent_nutrional_app"
-    compileSdk = 35
-
-    
-    
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -27,8 +24,8 @@ android {
         applicationId = "com.example.flouriscent_nutrional_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 26
-        targetSdk = 34
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -45,9 +42,3 @@ android {
 flutter {
     source = "../.."
 }
-dependencies {
-    implementation("org.tensorflow:tensorflow-lite:2.12.0") // Stable version
-    // implementation("org.tensorflow:tensorflow-lite-gpu:2.12.0") // Optional: For GPU support
-    // implementation("org.tensorflow:tensorflow-lite-support:0.4.4") // Optional: For TFLite Support Library
-}
-

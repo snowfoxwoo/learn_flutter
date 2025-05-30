@@ -2,11 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
 import 'package:flutter_tflite/flutter_tflite.dart';
-import 'package:image/image.dart' as img;
 
 class FoodScannerScreen extends StatefulWidget {
   const FoodScannerScreen({super.key});
@@ -31,27 +29,26 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     _loadModel();
   }
 
+  @override
+  void dispose() {
+    _controller?.dispose();
+    Tflite.close();
+    super.dispose();
+  }
+
   Future<void> _loadModel() async {
     try {
       await Tflite.loadModel(
         model: "assets/food101.tflite",
         labels: "assets/labels.txt",
       );
-      setState(() => _isModelLoaded = true);
+      if (mounted) {
+        setState(() => _isModelLoaded = true);
+      }
       debugPrint('Model loaded successfully');
     } catch (e) {
       debugPrint('Error loading model: $e');
     }
-  }
-
-  Future<void> _onCapturePressed() async {
-    if (!mounted) return;
-
-    final imagePath = await _takePicture();
-    if (!mounted || imagePath == null) return;
-
-    setState(() => _capturedImagePath = imagePath);
-    await _classifyImage(imagePath);
   }
 
   Future<void> _initializeCamera() async {
@@ -74,10 +71,18 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     }
   }
 
+  Future<void> _onCapturePressed() async {
+    if (!mounted) return;
+
+    final imagePath = await _takePicture();
+    if (!mounted || imagePath == null) return;
+
+    setState(() => _capturedImagePath = imagePath);
+    await _classifyImage(imagePath);
+  }
+
   Future<String?> _takePicture() async {
-    if (_isCapturing ||
-        _controller == null ||
-        !_controller!.value.isInitialized) {
+    if (_isCapturing || _controller?.value.isInitialized != true) {
       return null;
     }
 
@@ -105,16 +110,17 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     }
 
     try {
-      // Run inference
       final recognitions = await Tflite.runModelOnImage(
         path: imagePath,
-        imageMean: 127.5, // Adjust based on your model
-        imageStd: 127.5, // Adjust based on your model
-        numResults: 3, // Get top 3 results
-        threshold: 0.5, // Confidence threshold
+        imageMean: 127.5,
+        imageStd: 127.5,
+        numResults: 3,
+        threshold: 0.5,
       );
 
-      setState(() => _results = recognitions);
+      if (mounted) {
+        setState(() => _results = recognitions);
+      }
 
       if (recognitions != null) {
         for (var result in recognitions) {
@@ -125,15 +131,18 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
       }
     } catch (e) {
       debugPrint("Error during classification: $e");
-      setState(() => _results = null);
+      if (mounted) {
+        setState(() => _results = null);
+      }
     }
   }
 
-  @override
-  void dispose() {
-    _controller?.dispose();
-    Tflite.close(); // Clean up TFLite resources
-    super.dispose();
+  void _toggleFlash() {
+    final controller = _controller;
+    if (controller == null) return;
+
+    final isFlashOn = controller.value.flashMode != FlashMode.off;
+    controller.setFlashMode(isFlashOn ? FlashMode.off : FlashMode.torch);
   }
 
   @override
@@ -142,16 +151,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
       appBar: AppBar(
         title: const Text('Scan Food'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flash_on),
-            onPressed: () {
-              if (_controller?.value.flashMode == FlashMode.off) {
-                _controller?.setFlashMode(FlashMode.torch);
-              } else {
-                _controller?.setFlashMode(FlashMode.off);
-              }
-            },
-          ),
+          IconButton(icon: const Icon(Icons.flash_on), onPressed: _toggleFlash),
         ],
       ),
       body:
@@ -164,8 +164,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                       padding: const EdgeInsets.all(8.0),
                       child: Center(
                         child:
-                            _controller != null &&
-                                    _controller!.value.isInitialized
+                            _controller?.value.isInitialized == true
                                 ? CameraPreview(_controller!)
                                 : const Text('Camera not available'),
                       ),
@@ -182,12 +181,14 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children:
-                            _results!.map((result) {
-                              return Text(
-                                "${result['label']} - ${(result['confidence'] * 100).toStringAsFixed(1)}%",
-                                style: const TextStyle(fontSize: 16),
-                              );
-                            }).toList(),
+                            _results!
+                                .map(
+                                  (result) => Text(
+                                    "${result['label']} - ${(result['confidence'] * 100).toStringAsFixed(1)}%",
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                )
+                                .toList(),
                       ),
                     ),
                   Padding(

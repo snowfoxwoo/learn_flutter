@@ -114,13 +114,18 @@ class _ThemeSettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor.withValues(alpha: 0.1),
+        color:
+            isDark
+                ? Theme.of(context).cardColor.withValues(alpha: 0.1)
+                : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        ),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -131,7 +136,12 @@ class _ThemeSettingsCard extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          const Text("Choose how Flouriscent looks on your device"),
+          Text(
+            "Choose how Flouriscent looks on your device",
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
           const SizedBox(height: 16),
           _ThemeOptionsRow(themeProvider: themeProvider),
           const SizedBox(height: 20),
@@ -199,35 +209,30 @@ class _ThemeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color:
-                selected
-                    ? Colors.deepPurple.withValues(alpha: 0.2)
-                    : Theme.of(context).cardColor.withValues(alpha: 0.05),
+            color: _getBackgroundColor(isDark, selected),
             border: Border.all(
-              color: selected ? Colors.deepPurpleAccent : Colors.transparent,
+              color: _getBorderColor(isDark, selected),
               width: 2,
             ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                size: 28,
-                color: selected ? Colors.deepPurpleAccent : Colors.grey,
-              ),
+              Icon(icon, size: 28, color: _getIconColor(isDark, selected)),
               const SizedBox(height: 6),
               Text(
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
-                  color: selected ? Colors.deepPurpleAccent : Colors.grey,
+                  color: _getTextColor(isDark, selected),
                 ),
               ),
             ],
@@ -235,6 +240,38 @@ class _ThemeOption extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _getBackgroundColor(bool isDark, bool selected) {
+    if (selected) {
+      return isDark
+          ? Colors.deepPurple.withValues(alpha: 0.2)
+          : Colors.deepPurple.withValues(alpha: 0.1);
+    }
+    return isDark
+        ? Theme.of(context).cardColor.withValues(alpha: 0.05)
+        : Colors.white;
+  }
+
+  Color _getBorderColor(bool isDark, bool selected) {
+    if (selected) {
+      return isDark ? Colors.deepPurpleAccent : Colors.deepPurple;
+    }
+    return isDark ? Colors.transparent : Colors.grey.shade300;
+  }
+
+  Color _getIconColor(bool isDark, bool selected) {
+    if (selected) {
+      return isDark ? Colors.deepPurpleAccent : Colors.deepPurple;
+    }
+    return isDark ? Colors.grey : Colors.grey.shade500;
+  }
+
+  Color _getTextColor(bool isDark, bool selected) {
+    if (selected) {
+      return isDark ? Colors.deepPurpleAccent : Colors.deepPurple;
+    }
+    return isDark ? Colors.grey : Colors.grey.shade600;
   }
 }
 
@@ -252,20 +289,22 @@ class _ActiveThemeIndicator extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.teal.shade700 : Colors.teal.shade100,
+        color: isDark ? Colors.teal.shade700 : Colors.teal.shade50,
         borderRadius: BorderRadius.circular(12),
+        border: isDark ? null : Border.all(color: Colors.teal.shade200),
       ),
       child: Row(
         children: [
           Icon(
-            Icons.dark_mode,
-            color: isDark ? Colors.white : Colors.teal.shade800,
+            Icons.check_circle,
+            color: isDark ? Colors.white : Colors.teal.shade700,
           ),
           const SizedBox(width: 10),
           Text(
             "Currently Active\n$activeThemeName",
             style: TextStyle(
-              color: isDark ? Colors.white : Colors.teal.shade800,
+              color: isDark ? Colors.white : Colors.teal.shade700,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

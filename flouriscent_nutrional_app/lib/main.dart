@@ -1,3 +1,4 @@
+import 'package:flouriscent_nutrional_app/providers/user_metrics_provider.dart';
 import 'package:flouriscent_nutrional_app/screens/food_diary_screen.dart';
 import 'package:flouriscent_nutrional_app/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(isDark: isDark),
+
       child: const MyApp(),
     ),
   );
@@ -26,19 +28,22 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Flouriscent',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      themeMode: themeProvider.themeMode,
+    return ChangeNotifierProvider(
+      create: (context) => UserMetricsProvider(),
 
       // home: HomeScreen();
-      routes: {
-        '/': (context) => const HomeScreen(),
-        '/food-diary': (context) => const FoodDiaryScreen(),
-        '/settings': (context) => const SettingsScreen(),
-      },
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Flouriscent',
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        themeMode: themeProvider.themeMode,
+        routes: {
+          '/': (context) => const HomeScreen(),
+          '/food-diary': (context) => const FoodDiaryScreen(),
+          '/settings': (context) => const SettingsScreen(),
+        },
+      ),
     );
   }
 }

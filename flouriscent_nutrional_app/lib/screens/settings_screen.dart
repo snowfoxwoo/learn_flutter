@@ -1,332 +1,291 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../theme_provider.dart';
+// import '../../theme_provider.dart';
+import 'package:flouriscent_nutrional_app/providers/user_metrics_provider.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final _nameController = TextEditingController();
+  final _calorieGoalController = TextEditingController();
+  final _waterGoalController = TextEditingController();
+  final _stepGoalController = TextEditingController();
+  int _fastingHours = 16;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<UserMetricsProvider>();
+      final metrics = provider.metrics;
+
+      _nameController.text = provider.userName;
+      _calorieGoalController.text = metrics.calorieGoal.toString();
+      _waterGoalController.text = metrics.waterGoal.toString();
+      _stepGoalController.text = metrics.stepGoal.toString();
+      _fastingHours = metrics.fastingGoal.inHours;
+      setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        actions: [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.settings, color: Colors.deepPurple),
-          ),
-        ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          final themeMode = themeProvider.themeMode;
-          final activeThemeName = _getActiveThemeName(themeMode);
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildAppearanceSection(context, themeProvider, activeThemeName),
-              const SizedBox(height: 24),
-              _buildAboutSection(),
-              const SizedBox(height: 24),
-              _buildDataPrivacySection(),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildAppearanceSection(
-    BuildContext context,
-    ThemeProvider themeProvider,
-    String activeThemeName,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionHeader(title: ' Appearance'),
-        const SizedBox(height: 12),
-        _ThemeSettingsCard(
-          themeProvider: themeProvider,
-          activeThemeName: activeThemeName,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAboutSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionHeader(title: 'About'),
-        const SizedBox(height: 12),
-        _AboutTile(Icons.apps, 'App Version', '1.0.0'),
-        _AboutTile(Icons.build, 'Build Type', 'Testing'),
-        _AboutTile(Icons.person, 'Developer', 'Flouriscent Team'),
-      ],
-    );
-  }
-
-  Widget _buildDataPrivacySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionHeader(title: 'Data & Privacy'),
-        // Add your data privacy content here
-      ],
-    );
-  }
-
-  // Helper Methods
-  static String _getActiveThemeName(ThemeMode mode) {
-    return mode == ThemeMode.dark
-        ? "Dark Mode"
-        : mode == ThemeMode.light
-        ? "Light Mode"
-        : "System Default";
-  }
-}
-
-// Custom Widgets
-class _SectionHeader extends StatelessWidget {
-  final String title;
-
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-    );
-  }
-}
-
-class _ThemeSettingsCard extends StatelessWidget {
-  final ThemeProvider themeProvider;
-  final String activeThemeName;
-
-  const _ThemeSettingsCard({
-    required this.themeProvider,
-    required this.activeThemeName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color:
-            isDark
-                ? Theme.of(context).cardColor.withValues(alpha: 0.1)
-                : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.shade200,
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Theme Mode',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Choose how Flouriscent looks on your device",
-            style: TextStyle(
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _ThemeOptionsRow(themeProvider: themeProvider),
-          const SizedBox(height: 20),
-          _ActiveThemeIndicator(
-            isDark: isDark,
-            activeThemeName: activeThemeName,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThemeOptionsRow extends StatelessWidget {
-  final ThemeProvider themeProvider;
-
-  const _ThemeOptionsRow({required this.themeProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _ThemeOption(
-          context: context,
-          title: 'System',
-          icon: Icons.settings_suggest,
-          selected: themeProvider.themeMode == ThemeMode.system,
-          onTap: () => themeProvider.toggleTheme(ThemeMode.system),
-        ),
-        const SizedBox(width: 12),
-        _ThemeOption(
-          context: context,
-          title: 'Light',
-          icon: Icons.light_mode,
-          selected: themeProvider.themeMode == ThemeMode.light,
-          onTap: () => themeProvider.toggleTheme(ThemeMode.light),
-        ),
-        const SizedBox(width: 12),
-        _ThemeOption(
-          context: context,
-          title: 'Dark',
-          icon: Icons.dark_mode,
-          selected: themeProvider.themeMode == ThemeMode.dark,
-          onTap: () => themeProvider.toggleTheme(ThemeMode.dark),
-        ),
-      ],
-    );
-  }
-}
-
-class _ThemeOption extends StatelessWidget {
-  final BuildContext context;
-  final String title;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ThemeOption({
-    required this.context,
-    required this.title,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: _getBackgroundColor(isDark, selected),
-            border: Border.all(
-              color: _getBorderColor(isDark, selected),
-              width: 2,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 28, color: _getIconColor(isDark, selected)),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: _getTextColor(isDark, selected),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSection('Personal Information', [
+              _buildTextField('Name', _nameController, 'Enter your name'),
+            ]),
+            const SizedBox(height: 32),
+            _buildSection('Daily Goals', [
+              _buildTextField(
+                'Calorie Goal',
+                _calorieGoalController,
+                'e.g., 2000',
+                TextInputType.number,
+              ),
+              _buildTextField(
+                'Water Goal (L)',
+                _waterGoalController,
+                'e.g., 2.5',
+                TextInputType.number,
+              ),
+              _buildTextField(
+                'Step Goal',
+                _stepGoalController,
+                'e.g., 10000',
+                TextInputType.number,
+              ),
+              _buildFastingGoalSelector(),
+            ]),
+            const SizedBox(height: 32),
+            _buildSection('Actions', [
+              _buildActionButton(
+                'Reset Today\'s Data',
+                Icons.refresh,
+                Colors.orange,
+                _resetTodayData,
+              ),
+              _buildActionButton(
+                'Export Data',
+                Icons.download,
+                Colors.blue,
+                _exportData,
+              ),
+            ]),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _saveSettings,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade800,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                child: const Text(
+                  'Save Settings',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    String hint, [
+    TextInputType? keyboardType,
+  ]) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFastingGoalSelector() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Fasting Goal: ${_fastingHours}h',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Slider(
+              value: _fastingHours.toDouble(),
+              min: 12,
+              max: 24,
+              divisions: 12,
+              label: '${_fastingHours}h',
+              onChanged: (value) {
+                setState(() {
+                  _fastingHours = value.round();
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [Icon(icon), const SizedBox(width: 8), Text(title)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _saveSettings() async {
+    final provider = context.read<UserMetricsProvider>();
+
+    // Save name
+    await provider.setUserName(_nameController.text.trim());
+
+    // Save goals
+    await provider.updateGoals(
+      calorieGoal: int.tryParse(_calorieGoalController.text),
+      waterGoal: double.tryParse(_waterGoalController.text),
+      fastingGoal: Duration(hours: _fastingHours),
+      stepGoal: int.tryParse(_stepGoalController.text),
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Settings saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  void _resetTodayData() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Reset Today\'s Data'),
+            content: const Text(
+              'This will reset all your progress for today. Are you sure?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await context.read<UserMetricsProvider>().resetDailyData();
+                  Navigator.pop(context);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Today\'s data has been reset'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Reset'),
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 
-  Color _getBackgroundColor(bool isDark, bool selected) {
-    if (selected) {
-      return isDark
-          ? Colors.deepPurple.withValues(alpha: 0.2)
-          : Colors.deepPurple.withValues(alpha: 0.1);
-    }
-    return isDark
-        ? Theme.of(context).cardColor.withValues(alpha: 0.05)
-        : Colors.white;
-  }
-
-  Color _getBorderColor(bool isDark, bool selected) {
-    if (selected) {
-      return isDark ? Colors.deepPurpleAccent : Colors.deepPurple;
-    }
-    return isDark ? Colors.transparent : Colors.grey.shade300;
-  }
-
-  Color _getIconColor(bool isDark, bool selected) {
-    if (selected) {
-      return isDark ? Colors.deepPurpleAccent : Colors.deepPurple;
-    }
-    return isDark ? Colors.grey : Colors.grey.shade500;
-  }
-
-  Color _getTextColor(bool isDark, bool selected) {
-    if (selected) {
-      return isDark ? Colors.deepPurpleAccent : Colors.deepPurple;
-    }
-    return isDark ? Colors.grey : Colors.grey.shade600;
-  }
-}
-
-class _ActiveThemeIndicator extends StatelessWidget {
-  final bool isDark;
-  final String activeThemeName;
-
-  const _ActiveThemeIndicator({
-    required this.isDark,
-    required this.activeThemeName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.teal.shade700 : Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: isDark ? null : Border.all(color: Colors.teal.shade200),
+  void _exportData() {
+    // Placeholder for data export functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Export feature coming soon!'),
+        backgroundColor: Colors.blue,
       ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle,
-            color: isDark ? Colors.white : Colors.teal.shade700,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            "Currently Active\n$activeThemeName",
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.teal.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AboutTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const _AboutTile(this.icon, this.title, this.subtitle);
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-      leading: Icon(icon, color: Colors.deepPurple),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle),
     );
   }
 }

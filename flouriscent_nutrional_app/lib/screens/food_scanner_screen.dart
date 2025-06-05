@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
-import 'package:flutter_tflite/flutter_tflite.dart';
 import 'package:flutter/services.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:image/image.dart' as img;
 
 class FoodScannerScreen extends StatefulWidget {
   const FoodScannerScreen({super.key});
@@ -26,46 +28,11 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
   bool _showScanningOverlay = false;
   String _debugInfo = '';
 
-  Future<void> _testWithSampleImage() async {
-    if (!_isModelLoaded) {
-      _updateDebugInfo("Model not loaded - cannot test");
-      return;
-    }
-
-    setState(() {
-      _showScanningOverlay = true;
-      _results = null;
-      _debugInfo = 'Starting sample image test...';
-    });
-
-    try {
-      // Get the image path from assets
-      final byteData = await rootBundle.load('assets/test_food.jpg');
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/food_test.jpg');
-      await file.writeAsBytes(byteData.buffer.asUint8List());
-
-      _updateDebugInfo('Sample image saved to: ${file.path}');
-      _updateDebugInfo('File exists: ${await file.exists()}');
-      _updateDebugInfo('File size: ${await file.length()} bytes');
-
-      setState(() => _capturedImagePath = file.path);
-      await _classifyImage(file.path);
-    } catch (e) {
-      _updateDebugInfo('Error testing with sample image: $e');
-      if (mounted) {
-        setState(() {
-          _results = [
-            {'label': 'Error loading sample image: $e', 'confidence': 0.0},
-          ];
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _showScanningOverlay = false);
-      }
-    }
-  }
+  // TensorFlow Lite
+  Interpreter? _interpreter;
+  List<String>? _labels;
+  final int _inputSize = 224; // Standard input size for most models
+  final int _numResults = 5;
 
   void _updateDebugInfo(String info) {
     debugPrint(info);
@@ -84,27 +51,13 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     try {
       _updateDebugInfo('Starting initialization...');
 
-      // Initialize camera first
-      _updateDebugInfo('Initializing camera...');
       await _initializeCamera();
       _updateDebugInfo('Camera initialized successfully');
 
-      // Then load model with timeout
-      _updateDebugInfo('Loading model...');
-      await _loadModel().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          _updateDebugInfo('Model loading timeout after 30 seconds');
-          throw TimeoutException(
-            'Model loading timeout',
-            const Duration(seconds: 30),
-          );
-        },
-      );
-      _updateDebugInfo('Model loaded successfully');
+      await _loadModel();
+      _updateDebugInfo('Model loading completed');
     } catch (e) {
       _updateDebugInfo('Initialization error: $e');
-      // Continue anyway to show debug info
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -114,66 +67,32 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
 
   Future<void> _loadModel() async {
     try {
-      _updateDebugInfo('Attempting to load model...');
+      _updateDebugInfo('Loading TensorFlow Lite model...');
 
-      // First close any existing model
-      await Tflite.close();
-      _updateDebugInfo('Closed any existing models');
+      // Load model
+      _interpreter = await Interpreter.fromAsset('assets/models/food.tflite');
+      _updateDebugInfo('Model loaded successfully');
 
-      // Add timeout to the model loading
-      _updateDebugInfo('Loading food.tflite with 10 second timeout...');
-
-      String? res = await Tflite.loadModel(
-        model: "assets/models/food.tflite",
-        labels: "assets/models/labels.txt",
-        numThreads: 1,
-        isAsset: true,
-        useGpuDelegate: false,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          _updateDebugInfo('⏰ Model loading timed out after 10 seconds');
-          throw TimeoutException(
-            'Model loading timeout',
-            const Duration(seconds: 10),
-          );
-        },
+      // Load labels
+      final labelsData = await rootBundle.loadString(
+        'assets/models/labels.txt',
       );
+      _labels =
+          labelsData.split('\n').where((label) => label.isNotEmpty).toList();
+      _updateDebugInfo('Loaded ${_labels!.length} labels');
 
-      _updateDebugInfo('Model load completed with result: $res');
+      // Get model input/output info
+      final inputTensors = _interpreter!.getInputTensors();
+      final outputTensors = _interpreter!.getOutputTensors();
 
-      if (res != null) {
-        if (res == 'success' || res.toLowerCase().contains('success')) {
-          if (mounted) {
-            setState(() => _isModelLoaded = true);
-          }
-          _updateDebugInfo('✓ Model loaded successfully!');
-        } else {
-          _updateDebugInfo('✗ Model load failed with result: $res');
-          if (mounted) {
-            setState(() => _isModelLoaded = false);
-          }
-        }
-      } else {
-        _updateDebugInfo('✗ Model load returned null - likely file path issue');
-        if (mounted) {
-          setState(() => _isModelLoaded = false);
-        }
-      }
-    } on TimeoutException catch (e) {
-      _updateDebugInfo('⏰ Timeout: ${e.message}');
-      _updateDebugInfo(
-        'This usually means the model file is corrupted or incompatible',
-      );
-      if (mounted) {
-        setState(() => _isModelLoaded = false);
-      }
+      _updateDebugInfo('Input shape: ${inputTensors.first.shape}');
+      _updateDebugInfo('Output shape: ${outputTensors.first.shape}');
+
+      setState(() => _isModelLoaded = true);
+      _updateDebugInfo('✓ Model initialization complete!');
     } catch (e) {
       _updateDebugInfo('✗ Error loading model: $e');
-      _updateDebugInfo('Error type: ${e.runtimeType}');
-      if (mounted) {
-        setState(() => _isModelLoaded = false);
-      }
+      setState(() => _isModelLoaded = false);
     }
   }
 
@@ -192,8 +111,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
 
       _controller = CameraController(
         firstCamera,
-        ResolutionPreset
-            .medium, // Changed from high to medium for better compatibility
+        ResolutionPreset.medium,
         enableAudio: false,
       );
 
@@ -233,6 +151,40 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     }
   }
 
+  // New method to load test image
+  Future<void> _loadTestImage() async {
+    if (!mounted || _isCapturing) return;
+
+    setState(() {
+      _showScanningOverlay = true;
+      _debugInfo = 'Loading test image...\n';
+    });
+
+    try {
+      // Load the image from assets
+      final byteData = await rootBundle.load('assets/food_test.jpg');
+      final bytes = byteData.buffer.asUint8List();
+
+      // Save to temporary directory
+      final directory = await getTemporaryDirectory();
+      final path = join(directory.path, 'food_test.jpg');
+      await File(path).writeAsBytes(bytes);
+
+      setState(() {
+        _capturedImagePath = path;
+        _results = null;
+      });
+
+      await _classifyImage(path);
+    } catch (e) {
+      _updateDebugInfo('Error loading test image: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _showScanningOverlay = false);
+      }
+    }
+  }
+
   Future<String?> _takePicture() async {
     if (_controller?.value.isInitialized != true) {
       _updateDebugInfo('Camera not initialized');
@@ -244,15 +196,13 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
       final directory = await getTemporaryDirectory();
       final path = join(
         directory.path,
-        '${DateTime.now().millisecondsSinceEpoch}.jpg', // Changed to .jpg
+        '${DateTime.now().millisecondsSinceEpoch}.jpg',
       );
 
       final XFile file = await _controller!.takePicture();
       await file.saveTo(path);
 
       _updateDebugInfo('Picture saved to: $path');
-      _updateDebugInfo('File size: ${await File(path).length()} bytes');
-
       return path;
     } catch (e) {
       _updateDebugInfo('Error taking picture: $e');
@@ -265,7 +215,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
   }
 
   Future<void> _classifyImage(String imagePath) async {
-    if (!_isModelLoaded) {
+    if (!_isModelLoaded || _interpreter == null || _labels == null) {
       _updateDebugInfo("Model not loaded - cannot classify");
       return;
     }
@@ -273,110 +223,70 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     try {
       _updateDebugInfo("Starting classification for: $imagePath");
 
-      final file = File(imagePath);
-      final exists = await file.exists();
-      final size = exists ? await file.length() : 0;
+      // Read and decode image
+      final imageBytes = await File(imagePath).readAsBytes();
+      final image = img.decodeImage(imageBytes);
 
-      _updateDebugInfo("File exists: $exists, Size: $size bytes");
-
-      if (!exists || size == 0) {
-        _updateDebugInfo("Invalid image file");
-        setState(() {
-          _results = [
-            {'label': 'Invalid image file', 'confidence': 0.0},
-          ];
-        });
+      if (image == null) {
+        _updateDebugInfo("Failed to decode image");
         return;
       }
 
-      _updateDebugInfo("Running model inference...");
-
-      // Try different parameter combinations for debugging
-      final recognitions = await Tflite.runModelOnImage(
-        path: imagePath,
-        imageMean: 0.0, // Try different normalization
-        imageStd: 255.0, // Try different normalization
-        numResults: 10, // Get more results for debugging
-        threshold:
-            0.001, // Very low threshold to see if model produces any output
-        asynch: true,
+      // Resize image to model input size
+      final resizedImage = img.copyResize(
+        image,
+        width: _inputSize,
+        height: _inputSize,
       );
 
-      _updateDebugInfo("Model output received: ${recognitions != null}");
-      _updateDebugInfo("Number of results: ${recognitions?.length ?? 0}");
+      // Convert to the correct input format (uint8)
+      final input = _imageToInput(resizedImage);
 
-      if (recognitions != null && recognitions.isNotEmpty) {
-        _updateDebugInfo("Raw results: $recognitions");
+      // Prepare output - check if your model outputs float32 or uint8
+      // Most classification models output float32, so keep this as double
+      final output = List.generate(1, (_) => List.filled(_labels!.length, 0.0));
 
-        // Process and format results
-        final processedResults =
-            recognitions.map((result) {
-              final label = result['label']?.toString() ?? 'Unknown';
-              final confidence =
-                  (result['confidence'] as num?)?.toDouble() ?? 0.0;
+      _updateDebugInfo("Running inference...");
 
-              return {'label': _formatLabel(label), 'confidence': confidence};
-            }).toList();
+      // Run inference
+      _interpreter!.run(input, output);
 
-        if (mounted) {
-          setState(() {
-            _results = processedResults;
+      // Process results
+      final results = <Map<String, dynamic>>[];
+      final outputList = output[0] as List<double>;
+
+      for (int i = 0; i < outputList.length; i++) {
+        if (i < _labels!.length) {
+          results.add({
+            'label': _formatLabel(_labels![i]),
+            'confidence': outputList[i],
           });
         }
+      }
 
-        _updateDebugInfo("Processed ${processedResults.length} results");
-        for (var result in processedResults) {
-          final confidence = (result['confidence'] as num?) ?? 0.0;
-          _updateDebugInfo(
-            "${result['label']}: ${(confidence * 100).toStringAsFixed(2)}%",
-          );
-        }
-      } else {
+      // Sort by confidence
+      results.sort(
+        (a, b) =>
+            (b['confidence'] as double).compareTo(a['confidence'] as double),
+      );
+
+      // Take top results
+      final topResults = results.take(_numResults).toList();
+
+      _updateDebugInfo(
+        "Classification complete - ${topResults.length} results",
+      );
+
+      if (mounted) {
+        setState(() => _results = topResults);
+      }
+
+      // Log results
+      for (var result in topResults) {
+        final confidence = (result['confidence'] as double) * 100;
         _updateDebugInfo(
-          "No results from model - this suggests a model compatibility issue",
+          "${result['label']}: ${confidence.toStringAsFixed(2)}%",
         );
-
-        // Try alternative parameters
-        _updateDebugInfo("Trying alternative parameters...");
-        final altRecognitions = await Tflite.runModelOnImage(
-          path: imagePath,
-          imageMean: 127.5,
-          imageStd: 127.5,
-          numResults: 5,
-          threshold: 0.0,
-          asynch: false, // Try synchronous
-        );
-
-        if (altRecognitions != null && altRecognitions.isNotEmpty) {
-          _updateDebugInfo("Alternative params worked: $altRecognitions");
-          if (mounted) {
-            setState(() {
-              _results =
-                  altRecognitions
-                      .map(
-                        (r) => {
-                          'label': _formatLabel(
-                            r['label']?.toString() ?? 'Unknown',
-                          ),
-                          'confidence':
-                              (r['confidence'] as num?)?.toDouble() ?? 0.0,
-                        },
-                      )
-                      .toList();
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _results = [
-                {
-                  'label': 'No detection results - check model compatibility',
-                  'confidence': 0.0,
-                },
-              ];
-            });
-          }
-        }
       }
     } catch (e) {
       _updateDebugInfo("Classification error: $e");
@@ -391,6 +301,29 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
         });
       }
     }
+  }
+
+  List<List<List<List<int>>>> _imageToInput(img.Image image) {
+    final input = List.generate(
+      1,
+      (_) => List.generate(
+        _inputSize,
+        (_) => List.generate(_inputSize, (_) => List.filled(3, 0)),
+      ),
+    );
+
+    for (int i = 0; i < _inputSize; i++) {
+      for (int j = 0; j < _inputSize; j++) {
+        final pixel = image.getPixel(j, i);
+
+        // Keep pixel values as integers (0-255) for uint8 input
+        input[0][i][j][0] = img.getRed(pixel);
+        input[0][i][j][1] = img.getGreen(pixel);
+        input[0][i][j][2] = img.getBlue(pixel);
+      }
+    }
+
+    return input;
   }
 
   String _formatLabel(String rawLabel) {
@@ -531,7 +464,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${((result['confidence'] as num?) ?? 0 * 100).toStringAsFixed(1)}%',
+                          '${((result['confidence'] as double) * 100).toStringAsFixed(1)}%',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.blue[700],
@@ -640,17 +573,6 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                 onPressed: _loadModel,
                 child: const Text('Retry Loading Model'),
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _isModelLoaded = true; // Force skip model for testing
-                    _updateDebugInfo('⚠️ Model loading bypassed for testing');
-                  });
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                child: const Text('Skip Model (Test Camera Only)'),
-              ),
               const SizedBox(height: 20),
               _buildDebugInfo(),
             ],
@@ -664,17 +586,18 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
         title: const Text('Food Scanner'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.photo_library),
-            onPressed: _testWithSampleImage,
-            tooltip: 'Test with sample image',
-          ),
-          IconButton(
             icon: Icon(
               _currentFlashMode == FlashMode.off
                   ? Icons.flash_off
                   : Icons.flash_on,
             ),
             onPressed: _toggleFlash,
+          ),
+          // Add test button to app bar
+          IconButton(
+            icon: const Icon(Icons.image),
+            onPressed: _loadTestImage,
+            tooltip: 'Load test image',
           ),
         ],
       ),
@@ -734,7 +657,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
   @override
   void dispose() {
     _controller?.dispose();
-    Tflite.close();
+    _interpreter?.close();
     super.dispose();
   }
 }

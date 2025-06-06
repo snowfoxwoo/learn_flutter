@@ -1,2 +1,2 @@
-0 Pizza
-1 Chicken Wings
+0 Chicken Wings
+1 Rice

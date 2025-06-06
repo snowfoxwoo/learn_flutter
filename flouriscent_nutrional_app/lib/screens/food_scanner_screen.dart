@@ -8,6 +8,7 @@ import 'package:path/path.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
+import 'dart:math' as math;
 
 class FoodScannerScreen extends StatefulWidget {
   const FoodScannerScreen({super.key});
@@ -31,14 +32,19 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
   // TensorFlow Lite
   Interpreter? _interpreter;
   List<String>? _labels;
-  final int _inputSize = 224; // Standard input size for most models
+  late int _inputSize;
   final int _numResults = 5;
+  late TensorType _inputType;
+  late List<int> _inputShape;
+  late List<int> _outputShape;
 
   void _updateDebugInfo(String info) {
     debugPrint(info);
-    setState(() {
-      _debugInfo += '$info\n';
-    });
+    if (mounted) {
+      setState(() {
+        _debugInfo += '$info\n';
+      });
+    }
   }
 
   @override
@@ -82,11 +88,21 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
       _updateDebugInfo('Loaded ${_labels!.length} labels');
 
       // Get model input/output info
-      final inputTensors = _interpreter!.getInputTensors();
-      final outputTensors = _interpreter!.getOutputTensors();
+      final inputTensor = _interpreter!.getInputTensor(0);
+      final outputTensor = _interpreter!.getOutputTensor(0);
 
-      _updateDebugInfo('Input shape: ${inputTensors.first.shape}');
-      _updateDebugInfo('Output shape: ${outputTensors.first.shape}');
+      _inputShape = inputTensor.shape;
+      _outputShape = outputTensor.shape;
+      _inputType = inputTensor.type;
+
+      // Extract input size (assuming square input like 224x224)
+      _inputSize =
+          _inputShape[1]; // Assuming shape is [1, height, width, channels]
+
+      _updateDebugInfo('Input shape: $_inputShape');
+      _updateDebugInfo('Input type: $_inputType');
+      _updateDebugInfo('Input size: $_inputSize');
+      _updateDebugInfo('Output shape: $_outputShape');
 
       setState(() => _isModelLoaded = true);
       _updateDebugInfo('✓ Model initialization complete!');
@@ -125,7 +141,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
   }
 
   Future<void> _onCapturePressed() async {
-    if (!mounted || _isCapturing) return;
+    if (!mounted || _isCapturing || !_isModelLoaded) return;
 
     setState(() {
       _showScanningOverlay = true;
@@ -151,9 +167,8 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     }
   }
 
-  // New method to load test image
   Future<void> _loadTestImage() async {
-    if (!mounted || _isCapturing) return;
+    if (!mounted || _isCapturing || !_isModelLoaded) return;
 
     setState(() {
       _showScanningOverlay = true;
@@ -161,11 +176,9 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     });
 
     try {
-      // Load the image from assets
       final byteData = await rootBundle.load('assets/food_test.jpg');
       final bytes = byteData.buffer.asUint8List();
 
-      // Save to temporary directory
       final directory = await getTemporaryDirectory();
       final path = join(directory.path, 'food_test.jpg');
       await File(path).writeAsBytes(bytes);
@@ -232,6 +245,8 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
         return;
       }
 
+      _updateDebugInfo("Original image size: ${image.width}x${image.height}");
+
       // Resize image to model input size
       final resizedImage = img.copyResize(
         image,
@@ -239,57 +254,40 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
         height: _inputSize,
       );
 
-      // Convert to the correct input format (uint8)
+      _updateDebugInfo(
+        "Resized image to: ${resizedImage.width}x${resizedImage.height}",
+      );
+
+      // Convert image to appropriate input format
       final input = _imageToInput(resizedImage);
+      _updateDebugInfo("Input prepared with type: ${input.runtimeType}");
 
-      // Prepare output - check if your model outputs float32 or uint8
-      // Most classification models output float32, so keep this as double
-      final output = List.generate(1, (_) => List.filled(_labels!.length, 0.0));
-
-      _updateDebugInfo("Running inference...");
+      // Prepare output
+      final output = _prepareOutput();
+      _updateDebugInfo("Output prepared with shape: ${_outputShape}");
 
       // Run inference
       _interpreter!.run(input, output);
+      _updateDebugInfo("Inference completed successfully");
 
       // Process results
-      final results = <Map<String, dynamic>>[];
-      final outputList = output[0] as List<double>;
-
-      for (int i = 0; i < outputList.length; i++) {
-        if (i < _labels!.length) {
-          results.add({
-            'label': _formatLabel(_labels![i]),
-            'confidence': outputList[i],
-          });
-        }
-      }
-
-      // Sort by confidence
-      results.sort(
-        (a, b) =>
-            (b['confidence'] as double).compareTo(a['confidence'] as double),
-      );
-
-      // Take top results
-      final topResults = results.take(_numResults).toList();
-
-      _updateDebugInfo(
-        "Classification complete - ${topResults.length} results",
-      );
+      final results = _processResults(output);
 
       if (mounted) {
-        setState(() => _results = topResults);
+        setState(() => _results = results);
       }
 
-      // Log results
-      for (var result in topResults) {
+      // Log top results
+      for (int i = 0; i < math.min(results.length, 3); i++) {
+        final result = results[i];
         final confidence = (result['confidence'] as double) * 100;
         _updateDebugInfo(
           "${result['label']}: ${confidence.toStringAsFixed(2)}%",
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       _updateDebugInfo("Classification error: $e");
+      _updateDebugInfo("Stack trace: $stackTrace");
       if (mounted) {
         setState(() {
           _results = [
@@ -303,27 +301,109 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
     }
   }
 
-  List<List<List<List<int>>>> _imageToInput(img.Image image) {
-    final input = List.generate(
-      1,
-      (_) => List.generate(
-        _inputSize,
-        (_) => List.generate(_inputSize, (_) => List.filled(3, 0)),
-      ),
+  dynamic _imageToInput(img.Image image) {
+    _updateDebugInfo('Converting image to input format: $_inputType');
+
+    if (_inputType == TensorType.uint8) {
+      // For uint8 models (quantized) - use Uint8List for better performance
+      var input = Uint8List(
+        _inputShape[0] * _inputShape[1] * _inputShape[2] * _inputShape[3],
+      );
+      int pixelIndex = 0;
+
+      for (int i = 0; i < _inputSize; i++) {
+        for (int j = 0; j < _inputSize; j++) {
+          final pixel = image.getPixel(j, i);
+          input[pixelIndex++] = img.getRed(pixel);
+          input[pixelIndex++] = img.getGreen(pixel);
+          input[pixelIndex++] = img.getBlue(pixel);
+        }
+      }
+
+      // Reshape to proper dimensions
+      return input.buffer.asUint8List().reshape(_inputShape);
+    } else {
+      // For float32 models - use Float32List for better performance
+      var input = Float32List(
+        _inputShape[0] * _inputShape[1] * _inputShape[2] * _inputShape[3],
+      );
+      int pixelIndex = 0;
+
+      for (int i = 0; i < _inputSize; i++) {
+        for (int j = 0; j < _inputSize; j++) {
+          final pixel = image.getPixel(j, i);
+          input[pixelIndex++] = img.getRed(pixel) / 255.0;
+          input[pixelIndex++] = img.getGreen(pixel) / 255.0;
+          input[pixelIndex++] = img.getBlue(pixel) / 255.0;
+        }
+      }
+
+      // Reshape to proper dimensions
+      return input.buffer.asFloat32List().reshape(_inputShape);
+    }
+  }
+
+  dynamic _prepareOutput() {
+    final outputSize = _outputShape.reduce((a, b) => a * b);
+
+    if (_interpreter!.getOutputTensor(0).type == TensorType.uint8) {
+      return Uint8List(outputSize).reshape(_outputShape);
+    } else {
+      return Float32List(outputSize).reshape(_outputShape);
+    }
+  }
+
+  List<Map<String, dynamic>> _processResults(dynamic output) {
+    final results = <Map<String, dynamic>>[];
+
+    // Get the output data as a flat list
+    List<num> outputData;
+    if (output is List) {
+      outputData = _flattenOutput(output);
+    } else {
+      outputData = output.cast<num>();
+    }
+
+    // Convert to confidences (normalize if uint8)
+    List<double> confidences;
+    if (_interpreter!.getOutputTensor(0).type == TensorType.uint8) {
+      confidences = outputData.map((e) => e.toDouble() / 255.0).toList();
+    } else {
+      confidences = outputData.map((e) => e.toDouble()).toList();
+    }
+
+    // Create results with labels
+    final numResults = math.min(confidences.length, _labels!.length);
+    for (int i = 0; i < numResults; i++) {
+      results.add({
+        'label': _formatLabel(_labels![i]),
+        'confidence': confidences[i],
+      });
+    }
+
+    // Sort by confidence and return top results
+    results.sort(
+      (a, b) =>
+          (b['confidence'] as double).compareTo(a['confidence'] as double),
     );
+    return results.take(_numResults).toList();
+  }
 
-    for (int i = 0; i < _inputSize; i++) {
-      for (int j = 0; j < _inputSize; j++) {
-        final pixel = image.getPixel(j, i);
+  List<num> _flattenOutput(dynamic output) {
+    final List<num> flattened = [];
 
-        // Keep pixel values as integers (0-255) for uint8 input
-        input[0][i][j][0] = img.getRed(pixel);
-        input[0][i][j][1] = img.getGreen(pixel);
-        input[0][i][j][2] = img.getBlue(pixel);
+    void flatten(dynamic item) {
+      if (item is List) {
+        for (var element in item) {
+          flatten(element);
+        }
+      } else if (item is num) {
+        flattened.add(item);
       }
     }
 
-    return input;
+    flatten(output);
+    return flattened;
   }
 
   String _formatLabel(String rawLabel) {
@@ -441,41 +521,39 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          ..._results!
-              .take(5)
-              .map(
-                (result) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          result['label']?.toString() ?? 'Unknown',
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${((result['confidence'] as double) * 100).toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
+          ..._results!.map(
+            (result) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      result['label']?.toString() ?? 'Unknown',
+                      style: const TextStyle(fontSize: 16),
+                    ),
                   ),
-                ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${((result['confidence'] as double) * 100).toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
         ],
       ),
     );
@@ -593,7 +671,6 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
             ),
             onPressed: _toggleFlash,
           ),
-          // Add test button to app bar
           IconButton(
             icon: const Icon(Icons.image),
             onPressed: _loadTestImage,
@@ -609,8 +686,6 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                     ? _buildCameraPreview(context)
                     : const Center(child: Text('Camera not available')),
           ),
-
-          // Captured image thumbnail
           if (_capturedImagePath != null)
             Positioned(
               top: 20,
@@ -625,11 +700,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                 ),
               ),
             ),
-
-          // Debug info (top left)
           Positioned(top: 20, left: 20, right: 100, child: _buildDebugInfo()),
-
-          // Results and capture button
           Positioned(
             bottom: 20,
             left: 0,
@@ -639,7 +710,10 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
                 if (_results != null) _buildResults(),
                 const SizedBox(height: 16),
                 FloatingActionButton(
-                  onPressed: _isCapturing ? null : _onCapturePressed,
+                  onPressed:
+                      (_isCapturing || !_isModelLoaded)
+                          ? null
+                          : _onCapturePressed,
                   backgroundColor: Theme.of(context).primaryColor,
                   child:
                       _isCapturing

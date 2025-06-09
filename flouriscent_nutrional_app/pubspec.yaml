@@ -46,11 +46,9 @@ dependencies:
   path_provider: ^2.1.1
   path: ^1.8.3
   #TFLite
-  flutter_tflite: ^1.0.1
-  # tflite_flutter: ^0.10.0  # Recommended alternative
-
-  tflite_flutter_plus: ^0.0.1  # Or the latest stable
-  tflite_flutter_helper_plus: ^0.0.2
+  # tflite_flutter_helper: ^0.2.1
+  tflite_flutter: 0.11.0  # Use the latest official version
+  # tflite_flutter_helper_plus: ^0.0.2
   image: ^3.3.0  # For image decoding
 
 
@@ -64,18 +62,20 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
+  uses-material-design: true
   assets:
     - assets/models/
     - assets/models/food.tflite
     - assets/models/labels.txt
-    - assets/test_food.jpg  # if you have this test image
+    - assets/test_food.jpg
+    - assets/food_test.jpg  # if you have this test image
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

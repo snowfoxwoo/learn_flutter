@@ -4,7 +4,7 @@ import 'package:flouriscent_nutrional_app/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'theme_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() async {

@@ -1,3 +1,4 @@
+import 'package:flouriscent_nutrional_app/app_layout.dart';
 import 'package:flouriscent_nutrional_app/providers/user_metrics_provider.dart';
 import 'package:flouriscent_nutrional_app/screens/food_diary_screen.dart';
 import 'package:flouriscent_nutrional_app/screens/settings_screen.dart';
@@ -38,11 +39,12 @@ class MyApp extends StatelessWidget {
         theme: ThemeData.light(),
         darkTheme: ThemeData.dark(),
         themeMode: themeProvider.themeMode,
-        routes: {
-          '/': (context) => const HomeScreen(),
-          '/food-diary': (context) => const FoodDiaryScreen(),
-          '/settings': (context) => const SettingsScreen(),
-        },
+        home: const AppLayout(),
+        // routes: {
+        //   '/': (context) => const HomeScreen(),
+        //   '/food-diary': (context) => const FoodDiaryScreen(),
+        //   '/settings': (context) => const SettingsScreen(),
+        // },
       ),
     );
   }

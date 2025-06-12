@@ -7,6 +7,7 @@ import 'package:flouriscent_nutrional_app/providers/user_metrics_provider.dart';
 import '../widgets/home_header.dart';
 import '../widgets/fasting_timer_banner.dart';
 import '../widgets/main_actions.dart';
+import '../widgets/bottom_nav.dart';
 //TODO
 // import '../widgets/community_section.dart';
 // import '../widgets/blog_section.dart';
@@ -19,7 +20,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
+      backgroundColor: const Color.fromARGB(255, 248, 244, 244),
       body: SafeArea(
         child: Consumer<UserMetricsProvider>(
           builder: (context, provider, child) {
@@ -44,15 +45,6 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 20),
                         const MainActions(),
                         const SizedBox(height: 30),
-                        //TODO
-                        // const CommunitySection(),
-                        // const SizedBox(height: 30),
-                        // QuickStats(provider: provider),
-                        // const SizedBox(height: 30),
-                        // const BlogSection(),
-                        // const SizedBox(height: 30),
-                        // ProgressSection(provider: provider),
-                        // const SizedBox(height: 30),
                       ],
                     ),
                   ),

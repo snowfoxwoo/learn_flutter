@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flouriscent_nutrional_app/models/user_metrics.dart';
 
 class UserMetricsProvider extends ChangeNotifier {
@@ -25,11 +26,35 @@ class UserMetricsProvider extends ChangeNotifier {
 
   String _userName = 'User';
   bool _isLoading = false;
+  bool _isFasting = false;
+  DateTime? _fastingStartTime;
+  Timer? _fastingTimer;
+  String _selectedPreset = '16-8';
 
   bool get isLoading => _isLoading;
+  bool get isFasting => _isFasting;
+  String get selectedPreset => _selectedPreset;
+
+  // Available fasting presets
+  final Map<String, Duration> _fastingPresets = {
+    '12-12': const Duration(hours: 12),
+    '14-10': const Duration(hours: 14),
+    '16-8': const Duration(hours: 16),
+    '18-6': const Duration(hours: 18),
+    '20-4': const Duration(hours: 20),
+    '24-0': const Duration(hours: 24),
+  };
+
+  Map<String, Duration> get fastingPresets => _fastingPresets;
 
   UserMetricsProvider() {
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _fastingTimer?.cancel();
+    super.dispose();
   }
 
   // Greeting based on time of day
@@ -57,10 +82,27 @@ class UserMetricsProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final metricsJson = prefs.getString('user_metrics');
       _userName = prefs.getString('user_name') ?? 'User';
+      _isFasting = prefs.getBool('is_fasting') ?? false;
+      _selectedPreset = prefs.getString('selected_preset') ?? '16-8';
+
+      final fastingStartTimeMs = prefs.getInt('fasting_start_time');
+      if (fastingStartTimeMs != null) {
+        _fastingStartTime = DateTime.fromMillisecondsSinceEpoch(
+          fastingStartTimeMs,
+        );
+      }
 
       if (metricsJson != null) {
         final Map<String, dynamic> data = json.decode(metricsJson);
         _metrics = UserMetrics.fromJson(data);
+      }
+
+      // Update fasting goal based on selected preset
+      _updateFastingGoalFromPreset();
+
+      // Resume fasting timer if was fasting
+      if (_isFasting && _fastingStartTime != null) {
+        _startFastingTimer();
       }
     } catch (e) {
       debugPrint('Error loading user data: $e');
@@ -77,9 +119,107 @@ class UserMetricsProvider extends ChangeNotifier {
       final metricsJson = json.encode(_metrics.toJson());
       await prefs.setString('user_metrics', metricsJson);
       await prefs.setString('user_name', _userName);
+      await prefs.setBool('is_fasting', _isFasting);
+      await prefs.setString('selected_preset', _selectedPreset);
+
+      if (_fastingStartTime != null) {
+        await prefs.setInt(
+          'fasting_start_time',
+          _fastingStartTime!.millisecondsSinceEpoch,
+        );
+      } else {
+        await prefs.remove('fasting_start_time');
+      }
     } catch (e) {
       debugPrint('Error saving user data: $e');
     }
+  }
+
+  // Update fasting goal based on selected preset
+  void _updateFastingGoalFromPreset() {
+    final goalDuration = _fastingPresets[_selectedPreset];
+    if (goalDuration != null) {
+      _metrics = _metrics.copyWith(fastingGoal: goalDuration);
+    }
+  }
+
+  // Set selected fasting preset
+  Future<void> setFastingPreset(String preset) async {
+    if (_fastingPresets.containsKey(preset)) {
+      _selectedPreset = preset;
+      _updateFastingGoalFromPreset();
+      notifyListeners();
+      await _saveData();
+    }
+  }
+
+  // Start fasting timer
+  void _startFastingTimer() {
+    _fastingTimer?.cancel();
+    _fastingTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (_fastingStartTime != null) {
+        final currentDuration = DateTime.now().difference(_fastingStartTime!);
+        _metrics = _metrics.copyWith(
+          fastingTime: currentDuration,
+          lastUpdated: DateTime.now(),
+        );
+        notifyListeners();
+        _saveData();
+      }
+    });
+  }
+
+  // Start fasting
+  Future<void> startFasting() async {
+    _isFasting = true;
+    _fastingStartTime = DateTime.now();
+    _metrics = _metrics.copyWith(
+      fastingTime: const Duration(minutes: 0),
+      lastUpdated: DateTime.now(),
+    );
+
+    _startFastingTimer();
+    notifyListeners();
+    await _saveData();
+  }
+
+  // Stop fasting
+  Future<void> stopFasting() async {
+    _isFasting = false;
+    _fastingStartTime = null;
+    _fastingTimer?.cancel();
+    _fastingTimer = null;
+
+    notifyListeners();
+    await _saveData();
+  }
+
+  // Get next fast start time (for display purposes)
+  DateTime getNextFastStartTime() {
+    final now = DateTime.now();
+    // Assuming next fast starts at 6 AM tomorrow if not currently fasting
+    final tomorrow = DateTime(now.year, now.month, now.day + 1, 6, 0);
+    return tomorrow;
+  }
+
+  // Get formatted next fast time
+  String getNextFastTimeFormatted() {
+    final nextFast = getNextFastStartTime();
+    final now = DateTime.now();
+
+    if (nextFast.day == now.day) {
+      return 'Today ${_formatTime(nextFast)}';
+    } else {
+      return 'Tomorrow ${_formatTime(nextFast)}';
+    }
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    return '${displayHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
 
   // Update methods
@@ -138,15 +278,6 @@ class UserMetricsProvider extends ChangeNotifier {
     await _saveData();
   }
 
-  Future<void> startFasting() async {
-    _metrics = _metrics.copyWith(
-      fastingTime: const Duration(minutes: 1), // Just started
-      lastUpdated: DateTime.now(),
-    );
-    notifyListeners();
-    await _saveData();
-  }
-
   Future<void> updateFastingTime(Duration fastingTime) async {
     _metrics = _metrics.copyWith(
       fastingTime: fastingTime,
@@ -187,9 +318,14 @@ class UserMetricsProvider extends ChangeNotifier {
       calories: 0,
       water: 0.0,
       steps: 0,
-      fastingTime: const Duration(),
       lastUpdated: DateTime.now(),
     );
+
+    // Don't reset fasting if currently fasting
+    if (!_isFasting) {
+      _metrics = _metrics.copyWith(fastingTime: const Duration());
+    }
+
     notifyListeners();
     await _saveData();
   }

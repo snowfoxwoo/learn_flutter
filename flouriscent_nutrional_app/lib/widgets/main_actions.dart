@@ -17,9 +17,9 @@ class MainActions extends StatelessWidget {
           children: [
             Expanded(child: SecondaryActionButton.foodDiary()),
             const SizedBox(width: 12),
-            Expanded(child: SecondaryActionButton.recipes()),
-            const SizedBox(width: 12),
-            Expanded(child: SecondaryActionButton.plans()),
+            // Expanded(child: SecondaryActionButton.recipes()),
+            // const SizedBox(width: 12),
+            // Expanded(child: SecondaryActionButton.plans()),
           ],
         ),
       ],
@@ -131,24 +131,6 @@ class SecondaryActionButton extends StatelessWidget {
     onTap: () {
       //  Navigator.push(context, MaterialPageRoute(builder: (_) => FoodDiaryScreen()));
     }, // Add navigation
-  );
-
-  factory SecondaryActionButton.recipes() => SecondaryActionButton(
-    title: 'Recipes',
-    icon: Icons.restaurant_rounded,
-    gradient: const LinearGradient(
-      colors: [Color(0xFF4ECDC4), Color(0xFF44A08D)],
-    ),
-    onTap: () {}, // Add navigation
-  );
-
-  factory SecondaryActionButton.plans() => SecondaryActionButton(
-    title: 'Plans',
-    icon: Icons.schedule_rounded,
-    gradient: const LinearGradient(
-      colors: [Color(0xFF9575CD), Color(0xFF7E57C2)],
-    ),
-    onTap: () {}, // Add navigation
   );
 
   @override

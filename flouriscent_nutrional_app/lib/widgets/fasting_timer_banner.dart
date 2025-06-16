@@ -27,6 +27,42 @@ class FastingStage {
 }
 
 class _FastingTimerBannerState extends State<FastingTimerBanner> {
+  String _calculateFastEndTime(UserMetricsProvider provider) {
+    if (!provider.isFasting) return 'Not fasting';
+
+    // Get the fasting duration from the selected preset
+    final presetParts = provider.selectedPreset.split('-');
+    if (presetParts.length != 2) return 'Invalid preset';
+
+    try {
+      final fastingHours = int.parse(presetParts[0]);
+      final fastingDuration = Duration(hours: fastingHours);
+
+      // Calculate end time based on start time and duration
+      final endTime = provider.fastingStartTime!.add(fastingDuration);
+
+      // Format the time
+      final now = DateTime.now();
+      if (endTime.day == now.day) {
+        return 'Today ${_formatTime(endTime)}';
+      } else if (endTime.day == now.day + 1) {
+        return 'Tomorrow ${_formatTime(endTime)}';
+      } else {
+        return '${_formatDate(endTime)} ${_formatTime(endTime)}';
+      }
+    } catch (e) {
+      return 'Error';
+    }
+  }
+
+  String _formatTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime time) {
+    return '${time.month}/${time.day}';
+  }
+
   final List<FastingStage> fastingStages = [
     FastingStage(
       name: "Fed State",
@@ -485,7 +521,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                     ),
                     Text(
                       isFasting
-                          ? 'Tomorrow 06:00 AM'
+                          ? _calculateFastEndTime(widget.provider)
                           : widget.provider.getNextFastTimeFormatted(),
                       style: TextStyle(
                         color: Colors.grey[800],

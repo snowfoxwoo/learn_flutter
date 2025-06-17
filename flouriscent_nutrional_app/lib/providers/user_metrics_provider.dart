@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flouriscent_nutrional_app/models/user_metrics.dart';
 
 class UserMetricsProvider extends ChangeNotifier {
+  DateTime? get fastingStartTime => _fastingStartTime;
   UserMetrics _metrics = UserMetrics(
     calories: 1160,
     calorieGoal: 2000,

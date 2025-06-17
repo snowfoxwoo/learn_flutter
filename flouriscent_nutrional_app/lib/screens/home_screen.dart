@@ -7,7 +7,7 @@ import 'package:flouriscent_nutrional_app/providers/user_metrics_provider.dart';
 import '../widgets/home_header.dart';
 import '../widgets/fasting_timer_banner.dart';
 import '../widgets/main_actions.dart';
-import '../widgets/bottom_nav.dart';
+
 //TODO
 // import '../widgets/community_section.dart';
 // import '../widgets/blog_section.dart';

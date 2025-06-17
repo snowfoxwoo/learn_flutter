@@ -12,7 +12,102 @@ class FastingTimerBanner extends StatefulWidget {
   State<FastingTimerBanner> createState() => _FastingTimerBannerState();
 }
 
+class FastingStage {
+  final String name;
+  final IconData icon;
+  final double threshold;
+  final String description;
+
+  FastingStage({
+    required this.name,
+    required this.icon,
+    required this.threshold,
+    required this.description,
+  });
+}
+
 class _FastingTimerBannerState extends State<FastingTimerBanner> {
+  String _calculateFastEndTime(UserMetricsProvider provider) {
+    if (!provider.isFasting) return 'Not fasting';
+
+    // Get the fasting duration from the selected preset
+    final presetParts = provider.selectedPreset.split('-');
+    if (presetParts.length != 2) return 'Invalid preset';
+
+    try {
+      final fastingHours = int.parse(presetParts[0]);
+      final fastingDuration = Duration(hours: fastingHours);
+
+      // Calculate end time based on start time and duration
+      final endTime = provider.fastingStartTime!.add(fastingDuration);
+
+      // Format the time
+      final now = DateTime.now();
+      if (endTime.day == now.day) {
+        return 'Today ${_formatTime(endTime)}';
+      } else if (endTime.day == now.day + 1) {
+        return 'Tomorrow ${_formatTime(endTime)}';
+      } else {
+        return '${_formatDate(endTime)} ${_formatTime(endTime)}';
+      }
+    } catch (e) {
+      return 'Error';
+    }
+  }
+
+  String _formatTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime time) {
+    return '${time.month}/${time.day}';
+  }
+
+  final List<FastingStage> fastingStages = [
+    FastingStage(
+      name: "Fed State",
+      icon: Icons.restaurant,
+      threshold: 0.0,
+      description:
+          "Your body is digesting food and absorbing nutrients. Blood sugar levels are elevated.",
+    ),
+    FastingStage(
+      name: "Early Fasting",
+      icon: Icons.energy_savings_leaf,
+      threshold: 0.2,
+      description:
+          "Body starts using glucose from food for energy. Insulin levels begin to drop.",
+    ),
+    FastingStage(
+      name: "Gluconeogenesis",
+      icon: Icons.bloodtype,
+      threshold: 0.4,
+      description:
+          "As glycogen stores are depleted during fasting, body shifts to producing glucose through gluconeogenesis. Liver starts producing glucose from non-carb sources to maintain blood sugar levels. This ensures that essential tissues, like the brain, have consistent supply of glucose. ",
+    ),
+    FastingStage(
+      name: "Ketosis",
+      icon: Icons.local_fire_department,
+      threshold: 0.6,
+      description:
+          "As your body metabolizes fatty acids for energy, it produces ketone bodies as byproducts. When Ketone levels in the bloodstream rise above a certain threshold, your body enters a metabolic state called ketosis. In ketosis, ketone serve as an alternative fuel source to glucose, providing a steady supply of energy during fasting. Ketosis is characterized by increased fat burning, reduced appetite and enhanced mental clarity. Making it a hallmark of successful fasting.",
+    ),
+    FastingStage(
+      name: "Autophagy",
+      icon: Icons.cleaning_services,
+      threshold: 0.8,
+      description:
+          "Autophagy is a cellular recylcing process that ivolves the removal of damaged of dysfunctional cells and cellular components. Through autophagy, your body breaks down and recycles old proteins, organelles, and other cellular debris, promoting cellular renwal and repair. This process helps maintain cellular health, optimize metabolic function and enhance overall longevity and resilience.",
+    ),
+    FastingStage(
+      name: "Peak Growth Hormone",
+      icon: Icons.self_improvement,
+      threshold: 1.0,
+      description:
+          "Growth hormone peaks, promoting fat burning and muscle preservation.",
+    ),
+  ];
+
   final List<String> presets = [
     '12-12',
     '14-10',
@@ -21,6 +116,255 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
     '20-4',
     '24-0',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Check fasting status periodically
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFastingCompletion();
+    });
+  }
+
+  void _showStagesOverview(BuildContext context) {
+    final currentProgress = widget.provider.metrics.fastingProgress;
+    final currentStage = fastingStages.lastWhere(
+      (stage) => currentProgress >= stage.threshold,
+      orElse: () => fastingStages.first,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  MediaQuery.of(context).size.height *
+                  0.85, // Use 85% of screen height
+            ),
+            child: SingleChildScrollView(
+              // Make content scrollable
+              child: Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+
+                    // Title
+                    Text(
+                      'Fasting Stages Overview',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 10),
+
+                    // Current stage
+                    Text(
+                      'You are currently in: ${currentStage.name}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFFFF4757),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 20),
+
+                    // Stages list - wrapped in Flexible to prevent overflow
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true, // Important for nested scrolling
+                        physics:
+                            ClampingScrollPhysics(), // Better physics for bottom sheet
+                        children:
+                            fastingStages.map((stage) {
+                              final isCurrent = stage == currentStage;
+                              return Container(
+                                margin: EdgeInsets.only(bottom: 15),
+                                padding: EdgeInsets.all(15),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isCurrent
+                                          ? Color(
+                                            0xFFFF4757,
+                                          ).withValues(alpha: 0.1)
+                                          : Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color:
+                                        isCurrent
+                                            ? Color(0xFFFF4757)
+                                            : Colors.grey[200]!,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          stage.icon,
+                                          color: Color(0xFFFF4757),
+                                        ),
+                                        SizedBox(width: 10),
+                                        Expanded(
+                                          // Ensure text doesn't overflow
+                                          child: Text(
+                                            stage.name,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          '${(stage.threshold * 100).toInt()}%',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      stage.description,
+                                      style: TextStyle(fontSize: 14),
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                      ),
+                    ),
+
+                    // Share button
+                    Padding(
+                      padding: EdgeInsets.only(top: 20),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _shareFastingProgress(context);
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFFFF4757),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          minimumSize: Size(double.infinity, 50), // Full width
+                        ),
+                        child: Text(
+                          'Share My Progress',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: MediaQuery.of(context).padding.bottom,
+                    ), // Safe area padding
+                  ],
+                ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  void _shareFastingProgress(BuildContext context) {
+    // Implement your sharing logic here
+    // This could use the share plugin: https://pub.dev/packages/share
+    final progress = widget.provider.metrics.fastingProgress;
+    final currentStage = fastingStages.lastWhere(
+      (stage) => progress >= stage.threshold,
+      orElse: () => fastingStages.first,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Sharing your fasting progress at ${(progress * 100).toInt()}% - ${currentStage.name}',
+        ),
+      ),
+    );
+  }
+
+  void _showStageInfo(BuildContext context, FastingStage stage) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(stage.icon, color: Color(0xFFFF4757)),
+                SizedBox(width: 10),
+                Text(stage.name),
+              ],
+            ),
+            content: Text(stage.description),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _checkFastingCompletion() {
+    if (widget.provider.isFasting &&
+        widget.provider.metrics.fastingProgress >= 1.0) {
+      // Fasting completed
+      widget.provider.stopFasting();
+      _showCompletionNotification();
+    }
+
+    // Check again in 1 second
+    Future.delayed(Duration(seconds: 1), _checkFastingCompletion);
+  }
+
+  void _showCompletionNotification() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Fasting Complete!'),
+            content: Text(
+              'Congratulations! You\'ve completed your fasting period.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+    );
+
+    // Optional: Add vibration or sound
+    // HapticFeedback.vibrate();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +387,22 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (metrics.fastingProgress >= 1.0 && isFasting)
+            Text(
+              'Fasting Complete!',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            )
+          else
+            Text(
+              isFasting ? 'Fasting in progress' : 'Time since last fast',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
           // Header
           const SizedBox(height: 32),
 
@@ -71,6 +430,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                   painter: CircularProgressPainter(
                     progress: metrics.fastingProgress.clamp(0.0, 1.0),
                     color: Color(0xFFFF4757),
+                    fastingStages: fastingStages,
                   ),
                 ),
 
@@ -92,6 +452,45 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                       ),
                     ),
                   );
+                }),
+
+                // Inside your Stack widget, after the hour markers
+                ...fastingStages.map((stage) {
+                  if (stage.threshold > 0 && stage.threshold <= 1.0) {
+                    final angle =
+                        (stage.threshold * 360 - 90) * (math.pi / 180);
+                    final x = 130 * math.cos(angle);
+                    final y = 130 * math.sin(angle);
+
+                    return Positioned(
+                      left: 140 + x - 16,
+                      top: 140 + y - 16,
+                      child: GestureDetector(
+                        onTap: () => _showStageInfo(context, stage),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            stage.icon,
+                            color: Color(0xFFFF4757),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return SizedBox.shrink();
                 }),
 
                 // Center Content
@@ -122,7 +521,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                     ),
                     Text(
                       isFasting
-                          ? 'Tomorrow 06:00 AM'
+                          ? _calculateFastEndTime(widget.provider)
                           : widget.provider.getNextFastTimeFormatted(),
                       style: TextStyle(
                         color: Colors.grey[800],
@@ -228,14 +627,18 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
               ),
 
               // Share Button
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey[100],
+              // Replace the existing share button with this
+              GestureDetector(
+                onTap: () => _showStagesOverview(context),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey[100],
+                  ),
+                  child: Icon(Icons.share, color: Colors.grey[600], size: 24),
                 ),
-                child: Icon(Icons.share, color: Colors.grey[600], size: 24),
               ),
             ],
           ),
@@ -362,8 +765,13 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
 class CircularProgressPainter extends CustomPainter {
   final double progress;
   final Color color;
+  final List<FastingStage> fastingStages;
 
-  CircularProgressPainter({required this.progress, required this.color});
+  CircularProgressPainter({
+    required this.progress,
+    required this.color,
+    required this.fastingStages,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -382,12 +790,20 @@ class CircularProgressPainter extends CustomPainter {
 
     // Progress arc
     if (progress > 0) {
+      final currentStage = fastingStages.lastWhere(
+        (stage) => progress >= stage.threshold,
+        orElse: () => fastingStages.first,
+      );
       final progressPaint =
           Paint()
-            ..color = color
+            ..color = progress >= 1.0 ? Colors.green : Color(0xFFFF4757)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 8
             ..strokeCap = StrokeCap.round;
+
+      if (progress >= 1.0) {
+        progressPaint.strokeWidth = 10;
+      }
 
       final sweepAngle = 2 * math.pi * progress;
       canvas.drawArc(
@@ -397,6 +813,36 @@ class CircularProgressPainter extends CustomPainter {
         false,
         progressPaint,
       );
+
+      //small indicators for each stage
+      for (final stage in fastingStages) {
+        if (stage.threshold > 0 && stage.threshold <= 1.0) {
+          final stageAngle = (stage.threshold * 360 - 90) * (math.pi / 180);
+          final stageX = (radius - 5) * math.cos(stageAngle);
+          final stageY = (radius - 5) * math.sin(stageAngle);
+          final isCurrent = stage == currentStage;
+
+          canvas.drawCircle(
+            Offset(center.dx + stageX, center.dy + stageY),
+            isCurrent ? 6 : 3,
+            Paint()..color = isCurrent ? Colors.white : Color(0xFFFF4757),
+          );
+        }
+      }
+      if (progress >= 1.0) {
+        final checkmarkPaint =
+            Paint()
+              ..color = Colors.green
+              ..style = PaintingStyle.fill;
+
+        final path =
+            Path()
+              ..moveTo(center.dx - 20, center.dy)
+              ..lineTo(center.dx - 5, center.dy + 15)
+              ..lineTo(center.dx, center.dy - 15);
+
+        canvas.drawPath(path, checkmarkPaint);
+      }
     }
   }
 

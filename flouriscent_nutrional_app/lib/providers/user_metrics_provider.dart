@@ -4,7 +4,63 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flouriscent_nutrional_app/models/user_metrics.dart';
 
+class FastingRecord {
+  final DateTime date;
+  final DateTime startTime;
+  final DateTime endTime;
+  final Duration targetDuration;
+
+  FastingRecord({
+    required this.date,
+    required this.startTime,
+    required this.endTime,
+    required this.targetDuration,
+  });
+
+  // Convert to Map for JSON serialization
+  Map<String, dynamic> toJson() => {
+    'date': date.toIso8601String(),
+    'startTime': startTime.toIso8601String(),
+    'endTime': endTime.toIso8601String(),
+    'targetDuration': targetDuration.inMinutes,
+  };
+
+  // Create from Map for JSON deserialization
+  factory FastingRecord.fromJson(Map<String, dynamic> json) => FastingRecord(
+    date: DateTime.parse(json['date']),
+    startTime: DateTime.parse(json['startTime']),
+    endTime: DateTime.parse(json['endTime']),
+    targetDuration: Duration(minutes: json['targetDuration']),
+  );
+
+  String get formattedPeriod {
+    return '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+  }
+
+  String get formattedDuration {
+    final actualDuration = endTime.difference(startTime);
+    final hours = actualDuration.inHours;
+    final minutes = actualDuration.inMinutes % 60;
+    final targetHours = targetDuration.inHours;
+    return '${hours}h ${minutes}m / ${targetHours}h';
+  }
+
+  String _formatTime(DateTime time) {
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final period = time.hour < 12 ? 'AM' : 'PM';
+    return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $period';
+  }
+}
+
 class UserMetricsProvider extends ChangeNotifier {
+  List<FastingRecord> fastingHistory = [];
+
+  void addToHistory(FastingRecord record) {
+    fastingHistory.add(record);
+    // You might want to persist this to local storage
+    notifyListeners();
+  }
+
   DateTime? get fastingStartTime => _fastingStartTime;
   UserMetrics _metrics = UserMetrics(
     calories: 1160,
@@ -96,6 +152,13 @@ class UserMetricsProvider extends ChangeNotifier {
       if (metricsJson != null) {
         final Map<String, dynamic> data = json.decode(metricsJson);
         _metrics = UserMetrics.fromJson(data);
+
+        final historyJson = prefs.getString('fasting_history');
+        if (historyJson != null) {
+          final List<dynamic> historyData = json.decode(historyJson);
+          fastingHistory =
+              historyData.map((item) => FastingRecord.fromJson(item)).toList();
+        }
       }
 
       // Update fasting goal based on selected preset
@@ -131,6 +194,11 @@ class UserMetricsProvider extends ChangeNotifier {
       } else {
         await prefs.remove('fasting_start_time');
       }
+
+      final historyJson = json.encode(
+        fastingHistory.map((record) => record.toJson()).toList(),
+      );
+      await prefs.setString('fasting_history', historyJson);
     } catch (e) {
       debugPrint('Error saving user data: $e');
     }
@@ -186,6 +254,23 @@ class UserMetricsProvider extends ChangeNotifier {
 
   // Stop fasting
   Future<void> stopFasting() async {
+    if (!_isFasting || _fastingStartTime == null) return;
+
+    final endTime = DateTime.now();
+    final targetDuration =
+        _fastingPresets[_selectedPreset] ?? const Duration(hours: 16);
+
+    // Create and add the new record
+    addToHistory(
+      FastingRecord(
+        date: DateTime.now(),
+        startTime: _fastingStartTime!,
+        endTime: endTime,
+        targetDuration: targetDuration,
+      ),
+    );
+
+    // Reset fasting state
     _isFasting = false;
     _fastingStartTime = null;
     _fastingTimer?.cancel();
@@ -193,6 +278,14 @@ class UserMetricsProvider extends ChangeNotifier {
 
     notifyListeners();
     await _saveData();
+  }
+
+  // Add this method to clear history if needed
+  Future<void> clearFastingHistory() async {
+    fastingHistory.clear();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('fasting_history');
   }
 
   // Get next fast start time (for display purposes)

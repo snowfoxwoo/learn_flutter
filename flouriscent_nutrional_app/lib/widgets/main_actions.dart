@@ -1,5 +1,5 @@
 // widgets/main_actions.dart
-import 'package:flouriscent_nutrional_app/screens/food_diary_screen.dart';
+// import 'package:flouriscent_nutrional_app/screens/food_diary_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import '../screens/food_scanner_screen.dart';
@@ -10,19 +10,7 @@ class MainActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [
-        const CameraScanButton(),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: SecondaryActionButton.foodDiary()),
-            const SizedBox(width: 12),
-            // Expanded(child: SecondaryActionButton.recipes()),
-            // const SizedBox(width: 12),
-            // Expanded(child: SecondaryActionButton.plans()),
-          ],
-        ),
-      ],
+      children: [const CameraScanButton(), const SizedBox(height: 16)],
     );
   }
 }
@@ -121,17 +109,6 @@ class SecondaryActionButton extends StatelessWidget {
     required this.gradient,
     required this.onTap,
   });
-
-  factory SecondaryActionButton.foodDiary() => SecondaryActionButton(
-    title: 'Food Diary',
-    icon: Icons.book_rounded,
-    gradient: const LinearGradient(
-      colors: [Color(0xFFFF6B6B), Color(0xFFEE5A52)],
-    ),
-    onTap: () {
-      //  Navigator.push(context, MaterialPageRoute(builder: (_) => FoodDiaryScreen()));
-    }, // Add navigation
-  );
 
   @override
   Widget build(BuildContext context) {

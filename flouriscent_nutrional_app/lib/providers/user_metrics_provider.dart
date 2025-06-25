@@ -4,7 +4,125 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flouriscent_nutrional_app/models/user_metrics.dart';
 
+class FastingRecord {
+  final DateTime date;
+  final DateTime startTime;
+  final DateTime endTime;
+  final Duration targetDuration;
+
+  FastingRecord({
+    required this.date,
+    required this.startTime,
+    required this.endTime,
+    required this.targetDuration,
+  });
+
+  // Convert to Map for JSON serialization
+  Map<String, dynamic> toJson() => {
+    'date': date.toIso8601String(),
+    'startTime': startTime.toIso8601String(),
+    'endTime': endTime.toIso8601String(),
+    'targetDuration': targetDuration.inMinutes,
+  };
+
+  // Create from Map for JSON deserialization
+  factory FastingRecord.fromJson(Map<String, dynamic> json) => FastingRecord(
+    date: DateTime.parse(json['date']),
+    startTime: DateTime.parse(json['startTime']),
+    endTime: DateTime.parse(json['endTime']),
+    targetDuration: Duration(minutes: json['targetDuration']),
+  );
+
+  String get formattedPeriod {
+    return '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+  }
+
+  String get formattedDuration {
+    final actualDuration = endTime.difference(startTime);
+    final hours = actualDuration.inHours;
+    final minutes = actualDuration.inMinutes % 60;
+    final targetHours = targetDuration.inHours;
+    return '${hours}h ${minutes}m / ${targetHours}h';
+  }
+
+  String _formatTime(DateTime time) {
+    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final period = time.hour < 12 ? 'AM' : 'PM';
+    return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $period';
+  }
+}
+
+// New Water Record class
+class WaterRecord {
+  final DateTime date;
+  final double intake; // in liters
+  final double goal; // in liters
+
+  WaterRecord({required this.date, required this.intake, required this.goal});
+
+  // Convert to Map for JSON serialization
+  Map<String, dynamic> toJson() => {
+    'date': date.toIso8601String(),
+    'intake': intake,
+    'goal': goal,
+  };
+
+  // Create from Map for JSON deserialization
+  factory WaterRecord.fromJson(Map<String, dynamic> json) => WaterRecord(
+    date: DateTime.parse(json['date']),
+    intake: json['intake'].toDouble(),
+    goal: json['goal'].toDouble(),
+  );
+
+  bool get goalAchieved => intake >= goal;
+
+  double get completionPercentage => (intake / goal).clamp(0.0, 1.0);
+}
+
 class UserMetricsProvider extends ChangeNotifier {
+  List<FastingRecord> fastingHistory = [];
+  List<WaterRecord> waterHistory = [];
+
+  void addToHistory(FastingRecord record) {
+    fastingHistory.add(record);
+    // You might want to persist this to local storage
+    notifyListeners();
+    _saveData();
+  }
+
+  // Add water record to history
+  void addWaterToHistory(WaterRecord record) {
+    waterHistory.add(record);
+    notifyListeners();
+    _saveData();
+  }
+
+  // Save current day's water intake to history (called during daily reset)
+  void _saveCurrentWaterToHistory() {
+    final today = DateTime.now();
+    final todayRecord = WaterRecord(
+      date: DateTime(today.year, today.month, today.day),
+      intake: _metrics.water,
+      goal: _metrics.waterGoal,
+    );
+
+    // Check if there's already a record for today
+    final existingIndex = waterHistory.indexWhere(
+      (record) =>
+          record.date.year == today.year &&
+          record.date.month == today.month &&
+          record.date.day == today.day,
+    );
+
+    if (existingIndex != -1) {
+      // Update existing record
+      waterHistory[existingIndex] = todayRecord;
+    } else {
+      // Add new record
+      waterHistory.add(todayRecord);
+    }
+  }
+
   DateTime? get fastingStartTime => _fastingStartTime;
   UserMetrics _metrics = UserMetrics(
     calories: 1160,
@@ -30,7 +148,9 @@ class UserMetricsProvider extends ChangeNotifier {
   bool _isFasting = false;
   DateTime? _fastingStartTime;
   Timer? _fastingTimer;
+  Timer? _dailyResetTimer;
   String _selectedPreset = '16-8';
+  DateTime? _lastResetDate;
 
   bool get isLoading => _isLoading;
   bool get isFasting => _isFasting;
@@ -50,12 +170,61 @@ class UserMetricsProvider extends ChangeNotifier {
 
   UserMetricsProvider() {
     _loadData();
+    _scheduleDailyReset();
   }
 
   @override
   void dispose() {
     _fastingTimer?.cancel();
+    _dailyResetTimer?.cancel();
     super.dispose();
+  }
+
+  // Schedule daily reset at midnight
+  void _scheduleDailyReset() {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final timeUntilMidnight = tomorrow.difference(now);
+
+    _dailyResetTimer = Timer(timeUntilMidnight, () {
+      _performDailyReset();
+      // Schedule the next reset (every 24 hours)
+      _dailyResetTimer = Timer.periodic(const Duration(days: 1), (timer) {
+        _performDailyReset();
+      });
+    });
+  }
+
+  // Perform daily reset
+  void _performDailyReset() {
+    final today = DateTime.now();
+    final todayDateOnly = DateTime(today.year, today.month, today.day);
+
+    // Check if we haven't already reset today
+    if (_lastResetDate == null || _lastResetDate!.isBefore(todayDateOnly)) {
+      // Save current water intake to history before resetting
+      _saveCurrentWaterToHistory();
+
+      // Reset daily metrics
+      resetDailyData();
+
+      _lastResetDate = todayDateOnly;
+    }
+  }
+
+  // Check if daily reset is needed (called on app start)
+  void _checkAndPerformDailyReset() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (_lastResetDate == null || _lastResetDate!.isBefore(today)) {
+      if (_lastResetDate != null) {
+        // Save yesterday's water intake before resetting
+        _saveCurrentWaterToHistory();
+      }
+      resetDailyData();
+      _lastResetDate = today;
+    }
   }
 
   // Greeting based on time of day
@@ -86,6 +255,11 @@ class UserMetricsProvider extends ChangeNotifier {
       _isFasting = prefs.getBool('is_fasting') ?? false;
       _selectedPreset = prefs.getString('selected_preset') ?? '16-8';
 
+      final lastResetMs = prefs.getInt('last_reset_date');
+      if (lastResetMs != null) {
+        _lastResetDate = DateTime.fromMillisecondsSinceEpoch(lastResetMs);
+      }
+
       final fastingStartTimeMs = prefs.getInt('fasting_start_time');
       if (fastingStartTimeMs != null) {
         _fastingStartTime = DateTime.fromMillisecondsSinceEpoch(
@@ -96,6 +270,22 @@ class UserMetricsProvider extends ChangeNotifier {
       if (metricsJson != null) {
         final Map<String, dynamic> data = json.decode(metricsJson);
         _metrics = UserMetrics.fromJson(data);
+
+        final historyJson = prefs.getString('fasting_history');
+        if (historyJson != null) {
+          final List<dynamic> historyData = json.decode(historyJson);
+          fastingHistory =
+              historyData.map((item) => FastingRecord.fromJson(item)).toList();
+        }
+        // Load water history
+        final waterHistoryJson = prefs.getString('water_history');
+        if (waterHistoryJson != null) {
+          final List<dynamic> waterHistoryData = json.decode(waterHistoryJson);
+          waterHistory =
+              waterHistoryData
+                  .map((item) => WaterRecord.fromJson(item))
+                  .toList();
+        }
       }
 
       // Update fasting goal based on selected preset
@@ -123,6 +313,13 @@ class UserMetricsProvider extends ChangeNotifier {
       await prefs.setBool('is_fasting', _isFasting);
       await prefs.setString('selected_preset', _selectedPreset);
 
+      if (_lastResetDate != null) {
+        await prefs.setInt(
+          'last_reset_date',
+          _lastResetDate!.millisecondsSinceEpoch,
+        );
+      }
+
       if (_fastingStartTime != null) {
         await prefs.setInt(
           'fasting_start_time',
@@ -131,6 +328,18 @@ class UserMetricsProvider extends ChangeNotifier {
       } else {
         await prefs.remove('fasting_start_time');
       }
+
+      // Save fasting history
+      final historyJson = json.encode(
+        fastingHistory.map((record) => record.toJson()).toList(),
+      );
+      await prefs.setString('fasting_history', historyJson);
+
+      // Save water history
+      final waterHistoryJson = json.encode(
+        waterHistory.map((record) => record.toJson()).toList(),
+      );
+      await prefs.setString('water_history', waterHistoryJson);
     } catch (e) {
       debugPrint('Error saving user data: $e');
     }
@@ -186,6 +395,23 @@ class UserMetricsProvider extends ChangeNotifier {
 
   // Stop fasting
   Future<void> stopFasting() async {
+    if (!_isFasting || _fastingStartTime == null) return;
+
+    final endTime = DateTime.now();
+    final targetDuration =
+        _fastingPresets[_selectedPreset] ?? const Duration(hours: 16);
+
+    // Create and add the new record
+    addToHistory(
+      FastingRecord(
+        date: DateTime.now(),
+        startTime: _fastingStartTime!,
+        endTime: endTime,
+        targetDuration: targetDuration,
+      ),
+    );
+
+    // Reset fasting state
     _isFasting = false;
     _fastingStartTime = null;
     _fastingTimer?.cancel();
@@ -193,6 +419,22 @@ class UserMetricsProvider extends ChangeNotifier {
 
     notifyListeners();
     await _saveData();
+  }
+
+  // Add this method to clear history if needed
+  Future<void> clearFastingHistory() async {
+    fastingHistory.clear();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('fasting_history');
+  }
+
+  // Clear water history
+  Future<void> clearWaterHistory() async {
+    waterHistory.clear();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('water_history');
   }
 
   // Get next fast start time (for display purposes)

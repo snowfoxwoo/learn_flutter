@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import '../screens/food_scanner_screen.dart';
+import '../screens/water_history_screen.dart';
 
 class MainActions extends StatefulWidget {
   const MainActions({super.key});
@@ -14,11 +15,27 @@ class MainActions extends StatefulWidget {
 class _MainActionsState extends State<MainActions> {
   double waterIntake = 0.0; // Current water intake in ml
   final double dailyGoal = 2500.0; // Daily goal in ml
+  List<WaterEntry> waterHistory = []; // Track water intake history
 
   void _updateWaterIntake(double amount) {
     setState(() {
       waterIntake = (waterIntake + amount).clamp(0.0, dailyGoal);
+      // Add entry to history
+      waterHistory.add(WaterEntry(amount: amount, timestamp: DateTime.now()));
     });
+  }
+
+  void _showWaterHistory(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => WaterHistoryScreen(
+              waterHistory: waterHistory,
+              dailyGoal: dailyGoal,
+            ),
+      ),
+    );
   }
 
   @override
@@ -31,6 +48,7 @@ class _MainActionsState extends State<MainActions> {
           currentIntake: waterIntake,
           dailyGoal: dailyGoal,
           onUpdateIntake: _updateWaterIntake,
+          onShowHistory: () => _showWaterHistory(context),
         ),
         const SizedBox(height: 16),
       ],
@@ -42,12 +60,14 @@ class WaterTracker extends StatelessWidget {
   final double currentIntake;
   final double dailyGoal;
   final Function(double) onUpdateIntake;
+  final VoidCallback onShowHistory;
 
   const WaterTracker({
     super.key,
     required this.currentIntake,
     required this.dailyGoal,
     required this.onUpdateIntake,
+    required this.onShowHistory,
   });
 
   @override
@@ -82,10 +102,20 @@ class WaterTracker extends StatelessWidget {
                   color: Colors.black87,
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Colors.blue.shade400,
+              GestureDetector(
+                onTap: onShowHistory,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.blue.shade400,
+                  ),
+                ),
               ),
             ],
           ),
@@ -366,81 +396,6 @@ class CameraScanButton extends StatelessWidget {
       ),
     );
   }
-}
-
-@override
-Widget build(BuildContext context) {
-  return Container(
-    width: double.infinity,
-    height: 90,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(25),
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF00BCD4), Color(0xFF0097A7)],
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF00BCD4).withValues(alpha: 0.3),
-          blurRadius: 20,
-          offset: const Offset(0, 10),
-        ),
-      ],
-    ),
-    child: ElevatedButton(
-      onPressed: () async {
-        final imagePath = await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => FoodScannerScreen()),
-        );
-        if (imagePath != null) {
-          debugPrint('Image captured at: $imagePath');
-        }
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Icon(
-              Icons.camera_alt_rounded,
-              size: 30,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 20),
-          const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Scan Your Food',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                'AI-powered nutrition analysis',
-                style: TextStyle(fontSize: 14, color: Colors.white70),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class SecondaryActionButton extends StatelessWidget {

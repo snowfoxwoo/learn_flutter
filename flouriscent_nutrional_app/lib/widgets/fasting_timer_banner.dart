@@ -552,26 +552,6 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                   ),
                 ),
 
-                // Hour Markers
-                ...List.generate(12, (index) {
-                  final angle = (index * 30) * (math.pi / 180);
-                  final x = 120 * math.cos(angle - math.pi / 2);
-                  final y = 120 * math.sin(angle - math.pi / 2);
-
-                  return Positioned(
-                    left: 140 + x - 2,
-                    top: 140 + y - 2,
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                  );
-                }),
-
                 // Inside your Stack widget, after the hour markers
                 ...fastingStages.map((stage) {
                   if (stage.threshold > 0 && stage.threshold <= 1.0) {
@@ -899,13 +879,12 @@ class CircularProgressPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 10;
 
-    // Background arc
+    // Thin background track
     final backgroundPaint =
         Paint()
-          ..color = Colors.grey[200]!
+          ..color = Colors.grey[100]!
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 8
-          ..strokeCap = StrokeCap.round;
+          ..strokeWidth = 2;
 
     canvas.drawCircle(center, radius, backgroundPaint);
 
@@ -915,16 +894,13 @@ class CircularProgressPainter extends CustomPainter {
         (stage) => progress >= stage.threshold,
         orElse: () => fastingStages.first,
       );
+
       final progressPaint =
           Paint()
-            ..color = progress >= 1.0 ? Colors.green : Color(0xFFFF4757)
+            ..color = progress >= 1.0 ? Colors.green : color
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 8
+            ..strokeWidth = 4
             ..strokeCap = StrokeCap.round;
-
-      if (progress >= 1.0) {
-        progressPaint.strokeWidth = 10;
-      }
 
       final sweepAngle = 2 * math.pi * progress;
       canvas.drawArc(
@@ -935,32 +911,36 @@ class CircularProgressPainter extends CustomPainter {
         progressPaint,
       );
 
-      //small indicators for each stage
+      // Minimal stage indicators
       for (final stage in fastingStages) {
         if (stage.threshold > 0 && stage.threshold <= 1.0) {
           final stageAngle = (stage.threshold * 360 - 90) * (math.pi / 180);
-          final stageX = (radius - 5) * math.cos(stageAngle);
-          final stageY = (radius - 5) * math.sin(stageAngle);
+          final stageX = (radius - 2) * math.cos(stageAngle);
+          final stageY = (radius - 2) * math.sin(stageAngle);
           final isCurrent = stage == currentStage;
 
           canvas.drawCircle(
             Offset(center.dx + stageX, center.dy + stageY),
-            isCurrent ? 6 : 3,
-            Paint()..color = isCurrent ? Colors.white : Color(0xFFFF4757),
+            isCurrent ? 3 : 1.5,
+            Paint()..color = isCurrent ? color : Colors.grey[400]!,
           );
         }
       }
+
+      // Completion checkmark
       if (progress >= 1.0) {
         final checkmarkPaint =
             Paint()
               ..color = Colors.green
-              ..style = PaintingStyle.fill;
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2
+              ..strokeCap = StrokeCap.round;
 
         final path =
             Path()
-              ..moveTo(center.dx - 20, center.dy)
-              ..lineTo(center.dx - 5, center.dy + 15)
-              ..lineTo(center.dx, center.dy - 15);
+              ..moveTo(center.dx - 10, center.dy)
+              ..lineTo(center.dx, center.dy + 10)
+              ..lineTo(center.dx + 15, center.dy - 10);
 
         canvas.drawPath(path, checkmarkPaint);
       }

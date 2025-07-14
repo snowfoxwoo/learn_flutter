@@ -50,7 +50,7 @@ dependencies:
   tflite_flutter: 0.11.0  # Use the latest official version
   # tflite_flutter_helper_plus: ^0.0.2
   image: ^3.3.0  # For image decoding
-
+  intl: ^0.18.0  # For date formatting in history screen
 
 
 dev_dependencies:

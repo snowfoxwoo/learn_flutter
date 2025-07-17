@@ -7,6 +7,7 @@ class WeightTracker extends StatelessWidget {
   final double targetWeight;
   final String unit;
   final Function(double) onUpdateWeight;
+  final Function(double) onUpdateTargetWeight;
   final VoidCallback onShowHistory;
 
   const WeightTracker({
@@ -15,6 +16,7 @@ class WeightTracker extends StatelessWidget {
     required this.targetWeight,
     required this.unit,
     required this.onUpdateWeight,
+    required this.onUpdateTargetWeight,
     required this.onShowHistory,
   });
 
@@ -104,9 +106,21 @@ class WeightTracker extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Target: ${targetWeight.toStringAsFixed(1)} $unit',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  GestureDetector(
+                    onTap: () => _showTargetWeightDialog(context),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Target: ${targetWeight.toStringAsFixed(1)} $unit',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.edit, size: 16, color: Colors.grey.shade600),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -229,6 +243,54 @@ class WeightTracker extends StatelessWidget {
                 );
                 if (newWeight != null && newWeight > 0) {
                   onUpdateWeight(newWeight);
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showTargetWeightDialog(BuildContext context) {
+    final TextEditingController targetController = TextEditingController(
+      text: targetWeight.toStringAsFixed(1),
+    );
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Update Target Weight'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: targetController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Target Weight ($unit)',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.flag),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final double? newTarget = double.tryParse(
+                  targetController.text,
+                );
+                if (newTarget != null && newTarget > 0) {
+                  onUpdateTargetWeight(newTarget);
                   Navigator.of(context).pop();
                 }
               },

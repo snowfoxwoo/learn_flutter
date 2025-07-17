@@ -42,6 +42,12 @@ class _MainActionsState extends State<MainActions> {
     });
   }
 
+  void _updateTargetWeight(double newTargetWeight) {
+    setState(() {
+      targetWeight = newTargetWeight;
+    });
+  }
+
   void _showWaterHistory(BuildContext context) {
     Navigator.push(
       context,
@@ -88,6 +94,7 @@ class _MainActionsState extends State<MainActions> {
           targetWeight: targetWeight,
           unit: weightUnit,
           onUpdateWeight: _updateWeight,
+          onUpdateTargetWeight: _updateTargetWeight, // Add this line
           onShowHistory: _showWeightHistory,
         ),
         const SizedBox(height: 16),

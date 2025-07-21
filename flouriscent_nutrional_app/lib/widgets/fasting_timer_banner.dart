@@ -611,22 +611,22 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      isFasting
-                          ? 'Fast will end at'
-                          : 'Your next fast begins on',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                    Text(
-                      isFasting
-                          ? _calculateFastEndTime(widget.provider)
-                          : widget.provider.getNextFastTimeFormatted(),
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    // Text(
+                    //   isFasting
+                    //       ? 'Fast will end at'
+                    //       : 'Your next fast begins on',
+                    //   style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    // ),
+                    // Text(
+                    //   isFasting
+                    //       ? _calculateFastEndTime(widget.provider)
+                    //       : widget.provider.getNextFastTimeFormatted(),
+                    //   style: TextStyle(
+                    //     color: Colors.grey[800],
+                    //     fontSize: 14,
+                    //     fontWeight: FontWeight.w500,
+                    //   ),
+                    // ),
                     SizedBox(height: 16),
                     // Preset Selection Button
                     GestureDetector(

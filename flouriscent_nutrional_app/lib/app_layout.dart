@@ -1,6 +1,8 @@
 // lib/screens/app_layout.dart
 import 'package:flouriscent_nutrional_app/screens/home_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flouriscent_nutrional_app/screens/explore.dart';
+import 'package:flouriscent_nutrional_app/screens/report.dart';
 import '../widgets/bottom_nav.dart'; // Your BottomNavWidget
 
 class AppLayout extends StatefulWidget {
@@ -16,8 +18,8 @@ class _AppLayoutState extends State<AppLayout> {
   // Screens for each tab (replace with your actual screens)
   final List<Widget> _screens = [
     const HomeScreen(), // Index 0
-    // const ExploreScreen(), // Index 1
-    // const ReportScreen(),  // Index 2
+    const ExploreScreen(), // Index 1
+    const ReportScreen(), // Index 2
     // const AchievementsScreen(), // Index 3
     // const ProfileScreen(), // Index 4
   ];

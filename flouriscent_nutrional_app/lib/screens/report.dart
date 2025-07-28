@@ -46,26 +46,26 @@ class ReportScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildMetricCard(
+                  _buildWhiteMetricCard(
                     title: 'Current Streak',
                     value: '5 days',
                     icon: Icons.local_fire_department_outlined,
                     color: Colors.orange[200]!,
                   ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2),
                   const SizedBox(height: 12),
-                  _buildMetricCard(
+                  _buildWhiteMetricCard(
                     title: 'Longest Fast',
                     value: '18h 42m',
                     icon: Icons.timer_outlined,
                     color: Colors.blueGrey[200]!,
                   ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
                   const SizedBox(height: 24),
-                  _buildChart()
+                  _buildWhiteChart()
                       .animate()
                       .fadeIn(delay: 600.ms)
                       .scale(begin: Offset(0.95, 0.95)),
                   const SizedBox(height: 24),
-                  _buildQuoteCard()
+                  _buildWhiteQuoteCard()
                       .animate()
                       .fadeIn(delay: 800.ms)
                       .slideY(begin: 0.1),
@@ -78,15 +78,16 @@ class ReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricCard({
+  Widget _buildWhiteMetricCard({
     required String title,
     required String value,
     required IconData icon,
     required Color color,
   }) {
     return Card(
-      elevation: 1,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -122,10 +123,11 @@ class ReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildWhiteChart() {
     return Card(
-      elevation: 1,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -168,7 +170,7 @@ class ReportScreen extends StatelessWidget {
                       barRods: [
                         BarChartRodData(
                           toY: heights[index].toDouble(),
-                          color: Colors.grey[600]!,
+                          color: Colors.teal[400]!,
                           width: 14,
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -184,10 +186,11 @@ class ReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuoteCard() {
+  Widget _buildWhiteQuoteCard() {
     return Card(
-      elevation: 1,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -195,7 +198,7 @@ class ReportScreen extends StatelessWidget {
             SvgPicture.asset(
               'assets/quote.svg',
               height: 30,
-              color: Colors.grey[600],
+              color: Colors.teal[400],
             ),
             const SizedBox(height: 12),
             const Text(
@@ -207,12 +210,15 @@ class ReportScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.grey[200],
+                color: Colors.teal[50],
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
+              child: Text(
                 'You\'re doing great!',
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.teal[800],
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],

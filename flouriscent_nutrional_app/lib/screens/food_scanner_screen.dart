@@ -264,7 +264,7 @@ class _FoodScannerScreenState extends State<FoodScannerScreen> {
 
       // Prepare output
       final output = _prepareOutput();
-      _updateDebugInfo("Output prepared with shape: ${_outputShape}");
+      _updateDebugInfo("Output prepared with shape: $_outputShape");
 
       // Run inference
       _interpreter!.run(input, output);

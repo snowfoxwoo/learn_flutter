@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../providers/user_metrics_provider.dart';
-import '../utils/dialog_helpers.dart';
 
 class FastingTimerBanner extends StatefulWidget {
   final UserMetricsProvider provider;
@@ -27,25 +26,6 @@ class FastingStage {
 
 class _FastingTimerBannerState extends State<FastingTimerBanner> {
   bool _showCompletion = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkFastingCompletion();
-    });
-  }
-
-  void _checkFastingCompletion() {
-    if (widget.provider.isFasting &&
-        widget.provider.metrics.fastingProgress >= 1.0) {
-      widget.provider.stopFasting();
-      setState(() => _showCompletion = true);
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) setState(() => _showCompletion = false);
-      });
-    }
-  }
 
   final List<FastingStage> fastingStages = [
     FastingStage(
@@ -96,6 +76,25 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFastingCompletion();
+    });
+  }
+
+  void _checkFastingCompletion() {
+    if (widget.provider.isFasting &&
+        widget.provider.metrics.fastingProgress >= 1.0) {
+      widget.provider.stopFasting();
+      setState(() => _showCompletion = true);
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _showCompletion = false);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final metrics = widget.provider.metrics;
     final isFasting = widget.provider.isFasting;
@@ -122,342 +121,291 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Status Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color:
-                  isCompleted
-                      ? Colors.green.withOpacity(0.1)
-                      : isFasting
-                      ? primaryColor.withOpacity(0.1)
-                      : Colors.grey.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isCompleted
-                      ? Icons.check_circle
-                      : isFasting
-                      ? Icons.timer
-                      : Icons.access_time,
-                  size: 16,
-                  color:
-                      isCompleted
-                          ? Colors.green
-                          : isFasting
-                          ? primaryColor
-                          : Colors.grey[600],
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isCompleted
-                      ? 'Fasting Complete! 🎉'
-                      : isFasting
-                      ? 'Fasting in Progress'
-                      : 'Ready to Fast',
-                  style: TextStyle(
-                    color:
-                        isCompleted
-                            ? Colors.green
-                            : isFasting
-                            ? primaryColor
-                            : Colors.grey[600],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildStatusHeader(isCompleted, isFasting, primaryColor),
 
           const SizedBox(height: 32),
 
           // Circular Timer
-          SizedBox(
-            width: 300,
-            height: 300,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Background Circle
-                Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.grey[50]!, Colors.grey[100]!],
-                    ),
-                    border: Border.all(color: Colors.grey[200]!, width: 2),
-                  ),
-                ),
-
-                // Progress Circle
-                CustomPaint(
-                  size: const Size(300, 300),
-                  painter: _CircularProgressPainter(
-                    progress: metrics.fastingProgress.clamp(0.0, 1.0),
-                    color: primaryColor,
-                    fastingStages: fastingStages,
-                  ),
-                ),
-
-                // Stage Indicators
-                ...fastingStages.asMap().entries.map((entry) {
-                  final stage = entry.value;
-                  if (stage.threshold > 0 && stage.threshold <= 1.0) {
-                    final angle =
-                        (stage.threshold * 360 - 90) * (math.pi / 180);
-                    final x = 140 * math.cos(angle);
-                    final y = 140 * math.sin(angle);
-                    final isPassed = metrics.fastingProgress >= stage.threshold;
-
-                    return Positioned(
-                      left: 150 + x - 20,
-                      top: 150 + y - 20,
-                      child: GestureDetector(
-                        onTap: () => _showStageInfo(context, stage),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color:
-                                  isPassed ? primaryColor : Colors.grey[300]!,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            stage.icon,
-                            color: isPassed ? primaryColor : Colors.grey[400],
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                }),
-
-                // Center Content
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Center Content
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Timer Display
-                        Text(
-                          metrics.fastingTimeFormatted,
-                          style: TextStyle(
-                            color: Colors.black, // Changed to black
-                            fontSize: 42,
-                            fontWeight:
-                                FontWeight
-                                    .w500, // Medium weight instead of bold
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Progress Percentage
-                        Text(
-                          '${(metrics.fastingProgress * 100).toInt()}%',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Preset Selection Button
-                        GestureDetector(
-                          onTap: () => _showPresetsDialog(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: primaryColor,
-                              borderRadius: BorderRadius.circular(25),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  selectedPreset,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Timer Display
-                    Text(
-                      metrics.fastingTimeFormatted,
-                      style: TextStyle(
-                        color: primaryColor,
-                        fontSize: 42,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Progress Percentage
-                    Text(
-                      '${(metrics.fastingProgress * 100).toInt()}%',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Preset Selection Button
-                    GestureDetector(
-                      onTap: () => _showPresetsDialog(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primaryColor.withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              selectedPreset,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          _buildCircularTimer(metrics, primaryColor, selectedPreset),
 
           const SizedBox(height: 32),
 
           // Action Buttons Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // History Button
-              _buildActionButton(
-                icon: Icons.history,
-                onTap: () => _showFastingHistory(context),
-                tooltip: 'Fasting History',
-              ),
+          _buildActionButtons(isFasting, primaryColor),
+        ],
+      ),
+    );
+  }
 
-              // Main Action Button
-              GestureDetector(
-                onTap: () {
-                  if (isFasting) {
-                    widget.provider.stopFasting();
-                  } else {
-                    widget.provider.startFasting();
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 18,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isFasting ? Colors.red[400] : primaryColor,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isFasting ? Colors.red : primaryColor)
-                            .withOpacity(0.4),
-                        blurRadius: 15,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    isFasting ? 'Stop Fasting' : 'Start Fasting',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Stages Overview Button
-              _buildActionButton(
-                icon: Icons.insights,
-                onTap: () => _showStagesOverview(context),
-                tooltip: 'Fasting Stages',
-              ),
-            ],
+  Widget _buildStatusHeader(
+    bool isCompleted,
+    bool isFasting,
+    Color primaryColor,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color:
+            isCompleted
+                ? Colors.green.withOpacity(0.1)
+                : isFasting
+                ? primaryColor.withOpacity(0.1)
+                : Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isCompleted
+                ? Icons.check_circle
+                : isFasting
+                ? Icons.timer
+                : Icons.access_time,
+            size: 16,
+            color:
+                isCompleted
+                    ? Colors.green
+                    : isFasting
+                    ? primaryColor
+                    : Colors.grey[600],
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isCompleted
+                ? 'Fasting Complete! 🎉'
+                : isFasting
+                ? 'Fasting in Progress'
+                : 'Ready to Fast',
+            style: TextStyle(
+              color:
+                  isCompleted
+                      ? Colors.green
+                      : isFasting
+                      ? primaryColor
+                      : Colors.grey[600],
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCircularTimer(
+    dynamic metrics,
+    Color primaryColor,
+    String selectedPreset,
+  ) {
+    return SizedBox(
+      width: 300,
+      height: 300,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Background Circle
+          Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.grey[50]!, Colors.grey[100]!],
+              ),
+              border: Border.all(color: Colors.grey[200]!, width: 2),
+            ),
+          ),
+
+          // Progress Circle
+          CustomPaint(
+            size: const Size(300, 300),
+            painter: _CircularProgressPainter(
+              progress: metrics.fastingProgress.clamp(0.0, 1.0),
+              color: primaryColor,
+              fastingStages: fastingStages,
+            ),
+          ),
+
+          // Stage Indicators
+          ...fastingStages.asMap().entries.map((entry) {
+            final stage = entry.value;
+            if (stage.threshold > 0 && stage.threshold <= 1.0) {
+              final angle = (stage.threshold * 360 - 90) * (math.pi / 180);
+              final x = 140 * math.cos(angle);
+              final y = 140 * math.sin(angle);
+              final isPassed = metrics.fastingProgress >= stage.threshold;
+
+              return Positioned(
+                left: 150 + x - 20,
+                top: 150 + y - 20,
+                child: GestureDetector(
+                  onTap: () => _showStageInfo(context, stage),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isPassed ? primaryColor : Colors.grey[300]!,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      stage.icon,
+                      color: isPassed ? primaryColor : Colors.grey[400],
+                      size: 20,
+                    ),
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+
+          // Center Content
+          _buildCenterContent(metrics, primaryColor, selectedPreset),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenterContent(
+    dynamic metrics,
+    Color primaryColor,
+    String selectedPreset,
+  ) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Timer Display
+        Text(
+          metrics.fastingTimeFormatted,
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 42,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -1,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Progress Percentage
+        Text(
+          '${(metrics.fastingProgress * 100).toInt()}%',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Preset Selection Button
+        GestureDetector(
+          onTap: () => _showPresetsDialog(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  selectedPreset,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(bool isFasting, Color primaryColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // History Button
+        _buildActionButton(
+          icon: Icons.history,
+          onTap: () => _showFastingHistory(context),
+          tooltip: 'Fasting History',
+        ),
+
+        // Main Action Button
+        GestureDetector(
+          onTap: () {
+            if (isFasting) {
+              widget.provider.stopFasting();
+            } else {
+              widget.provider.startFasting();
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+            decoration: BoxDecoration(
+              color: isFasting ? Colors.red[400] : primaryColor,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: (isFasting ? Colors.red : primaryColor).withOpacity(
+                    0.4,
+                  ),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Text(
+              isFasting ? 'Stop Fasting' : 'Start Fasting',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        // Stages Overview Button
+        _buildActionButton(
+          icon: Icons.insights,
+          onTap: () => _showStagesOverview(context),
+          tooltip: 'Fasting Stages',
+        ),
+      ],
     );
   }
 
@@ -517,7 +465,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                 const SizedBox(height: 20),
 
                 // Title
-                Text(
+                const Text(
                   'Select Fasting Plan',
                   style: TextStyle(
                     fontSize: 18,
@@ -714,7 +662,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                   ],
                 ),
               ),
@@ -773,7 +721,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder:
@@ -801,7 +749,7 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                     const SizedBox(height: 20),
 
                     // Title
-                    Text(
+                    const Text(
                       'Fasting Stages Overview',
                       style: TextStyle(
                         fontSize: 20,
@@ -814,9 +762,9 @@ class _FastingTimerBannerState extends State<FastingTimerBanner> {
                     // Current stage
                     Text(
                       'You are currently in: ${currentStage.name}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 16,
-                        color: const Color(0xFFFF4757),
+                        color: Color(0xFFFF4757),
                         fontWeight: FontWeight.w600,
                       ),
                       textAlign: TextAlign.center,

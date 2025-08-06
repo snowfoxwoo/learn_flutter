@@ -8,8 +8,7 @@ plugins {
 android {
     ndkVersion = "27.0.12077973"
     namespace = "com.example.flouriscent_nutrional_app"
-    compileSdk = 35
-
+    compileSdk = 36
     
     
 

@@ -1,12 +1,9 @@
 import 'package:flouriscent_nutrional_app/app_layout.dart';
 import 'package:flouriscent_nutrional_app/providers/user_metrics_provider.dart';
-import 'package:flouriscent_nutrional_app/screens/food_diary_screen.dart';
-import 'package:flouriscent_nutrional_app/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/theme_provider.dart';
-import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

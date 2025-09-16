@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class UserMetrics {
   final int calories;
   final int calorieGoal;
